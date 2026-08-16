@@ -2,7 +2,9 @@
 
 Four users (Ryan, Sean — Finance; Daniel, Mitchell — Operations) share one org and one agent. Rules are extracted from ordinary conversation, stored at personal, team, or org scope, and applied automatically in later turns, later sessions, and other people's sessions when the scope allows it.
 
-**Run it:** `npm install && npm run dev`. Set `ANTHROPIC_API_KEY` for the live agent; without one it falls back to a deterministic extractor and a reporting agent so the permission behaviour is still demonstrable. SQLite lives at `data/memory.db` and seeds itself on first request — set `DATABASE_URL`/`DATABASE_AUTH_TOKEN` to point at Turso for a hosted deploy.
+**Live:** https://chat-agent-sand.vercel.app — seeded so both required demos are one click from the empty sessions.
+
+**Run it:** `npm install && npm run dev`. Set `OPENAI_API_KEY` (or `ANTHROPIC_API_KEY` — whichever is present wins, OpenAI first); with neither, a deterministic extractor and a reporting agent keep the permission behaviour demonstrable. SQLite lives at `data/memory.db` and seeds itself on first request — set `DATABASE_URL`/`DATABASE_AUTH_TOKEN` to point at Turso for durable hosted state. `node scripts/demo.mjs <base-url>` replays every demo against a running instance; `scripts/smoke.sh` asserts the permission boundary.
 
 ### Memory schema
 

@@ -21,11 +21,23 @@ export async function POST(req: Request) {
 
     const actor = await loadActor(userId);
 
-    // You may only speak into your own session.
-    const session = await one<ChatSession>(
-      `SELECT * FROM sessions WHERE id = ? AND user_id = ?`,
-      [sessionId, userId],
-    );
+    // You may only speak into your own session. Distinguish "not yours" from
+    // "gone" — on ephemeral storage the second case is a deployment problem,
+    // not a permission one, and conflating them sends people hunting for a
+    // bug in the permission layer.
+    const anySession = await one<ChatSession>(`SELECT * FROM sessions WHERE id = ?`, [
+      sessionId,
+    ]);
+    if (!anySession) {
+      throw new HttpError(
+        409,
+        "That session no longer exists on this server instance. This deployment is using " +
+          "per-instance storage — set DATABASE_URL to a Turso database for durable state, " +
+          "or use one of the seeded sessions, which exist on every instance.",
+      );
+    }
+    const session =
+      anySession.user_id === userId ? anySession : null;
     if (!session) throw new HttpError(403, "That session does not belong to this user.");
 
     // 1. Record the turn.
