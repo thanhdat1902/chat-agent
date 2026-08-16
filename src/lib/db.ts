@@ -8,9 +8,24 @@ import { createClient, type Client, type InValue } from "@libsql/client";
 let _client: Client | null = null;
 let _ready: Promise<void> | null = null;
 
+/**
+ * Resolution order:
+ *   1. DATABASE_URL — a Turso `libsql://` URL in production. Durable, shared
+ *      across serverless instances. This is what a real deployment uses.
+ *   2. On Vercel with no DATABASE_URL: `/tmp`, the only writable path in the
+ *      runtime. Seeded per instance, so the demo data is always present but
+ *      anything typed during a session is not shared across instances.
+ *   3. Locally: a plain file under ./data.
+ */
+function defaultUrl(): string {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  if (process.env.VERCEL) return "file:/tmp/memory.db";
+  return "file:./data/memory.db";
+}
+
 function rawClient(): Client {
   if (!_client) {
-    const url = process.env.DATABASE_URL ?? "file:./data/memory.db";
+    const url = defaultUrl();
     _client = createClient({
       url,
       authToken: process.env.DATABASE_AUTH_TOKEN,

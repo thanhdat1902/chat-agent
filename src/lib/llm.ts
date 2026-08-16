@@ -59,6 +59,18 @@ export interface Turn {
   content: string;
 }
 
+/**
+ * `output_config` (effort + structured outputs) is a current Messages API
+ * field whose TypeScript definitions the installed SDK does not carry yet.
+ * The wire format is correct and the SDK forwards unknown keys unchanged, so
+ * this narrows the escape hatch to one place instead of casting at each call.
+ */
+function anthropicParams(
+  params: Record<string, unknown>,
+): Anthropic.MessageCreateParamsNonStreaming {
+  return params as unknown as Anthropic.MessageCreateParamsNonStreaming;
+}
+
 /** Free-form completion. Returns null when no provider is configured. */
 export async function completeText(
   system: string,
@@ -75,15 +87,17 @@ export async function completeText(
       return res.choices[0]?.message?.content ?? null;
     }
     case "anthropic": {
-      const res = await anthropic().messages.create({
-        model: modelName(),
-        // Thinking shares this budget on Opus 5, so leave headroom above the
-        // couple of hundred tokens a chat reply actually needs.
-        max_tokens: maxTokens,
-        output_config: { effort: "low" },
-        system,
-        messages,
-      });
+      const res = await anthropic().messages.create(
+        anthropicParams({
+          model: modelName(),
+          // Thinking shares this budget on Opus 5, so leave headroom above the
+          // couple of hundred tokens a chat reply actually needs.
+          max_tokens: maxTokens,
+          output_config: { effort: "low" },
+          system,
+          messages,
+        }),
+      );
       for (const block of res.content) if (block.type === "text") return block.text;
       return null;
     }
@@ -125,13 +139,15 @@ export async function completeJson<T>(
       break;
     }
     case "anthropic": {
-      const res = await anthropic().messages.create({
-        model: modelName(),
-        max_tokens: maxTokens,
-        output_config: { effort: "low", format: { type: "json_schema", schema } },
-        system,
-        messages: [{ role: "user", content: user }],
-      });
+      const res = await anthropic().messages.create(
+        anthropicParams({
+          model: modelName(),
+          max_tokens: maxTokens,
+          output_config: { effort: "low", format: { type: "json_schema", schema } },
+          system,
+          messages: [{ role: "user", content: user }],
+        }),
+      );
       for (const block of res.content) {
         if (block.type === "text") {
           text = block.text;
