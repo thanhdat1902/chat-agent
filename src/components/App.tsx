@@ -7,6 +7,9 @@ import Conversation from "./Conversation";
 import MemoryPanel from "./MemoryPanel";
 import ConfirmDialog, { type ConfirmRequest } from "./ConfirmDialog";
 
+/** Marks a locally-appended message that the server has not confirmed yet. */
+export const PENDING_PREFIX = "pending_";
+
 export interface ChatMeta {
   injected: string[];
   overridden: { id: string; beatenBy: string }[];
@@ -87,20 +90,43 @@ export default function App({ initial }: { initial: AppState }) {
     [refresh, state.actor.id, state.users, state.sessionsByUser],
   );
 
+  /**
+   * A turn does real work before it can answer — extraction, retrieval, then
+   * generation — so waiting for the response to render the user's own message
+   * left them staring at an empty box wondering whether Enter registered. The
+   * message is appended locally the moment it is sent, and replaced when the
+   * server's authoritative state arrives. `PENDING_PREFIX` marks the local
+   * copy so it can be styled as in-flight and rolled back if the send fails.
+   */
   const send = useCallback(
     async (content: string) => {
-      if (!state.activeSessionId || busy) return;
+      const sessionId = state.activeSessionId;
+      if (!sessionId || busy) return;
+
+      const pendingId = `${PENDING_PREFIX}${Date.now()}`;
+      setState((s) => ({
+        ...s,
+        messages: [
+          ...s.messages,
+          {
+            id: pendingId,
+            session_id: sessionId,
+            role: "user" as const,
+            content,
+            created_at: new Date().toISOString(),
+            used_memory_ids: [],
+            created_memory_ids: [],
+          },
+        ],
+      }));
       setBusy(true);
       setError(null);
+
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            userId: state.actor.id,
-            sessionId: state.activeSessionId,
-            content,
-          }),
+          body: JSON.stringify({ userId: state.actor.id, sessionId, content }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "Request failed");
@@ -108,6 +134,9 @@ export default function App({ initial }: { initial: AppState }) {
         setLastMeta(data.retrieval as ChatMeta);
       } catch (e) {
         setError((e as Error).message);
+        // The turn never landed, so take the local copy back out rather than
+        // showing a message that was not stored.
+        setState((s) => ({ ...s, messages: s.messages.filter((m) => m.id !== pendingId) }));
       } finally {
         setBusy(false);
       }

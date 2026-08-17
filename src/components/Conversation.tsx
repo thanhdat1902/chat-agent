@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { AppState, MemoryView } from "@/lib/state";
 import type { ChatSession, Scope } from "@/lib/types";
 import { DEMO_PROMPTS } from "./demos";
-import type { ChatMeta } from "./App";
+import { PENDING_PREFIX, type ChatMeta } from "./App";
 
 const SCOPE_STYLE: Record<string, string> = {
   org: "bg-[#fdf1e3] text-[#9a5b13] border-[#f0d6b4]",
@@ -162,11 +162,11 @@ export default function Conversation({
                   className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed ${
+                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed transition-opacity ${
                       m.role === "user"
                         ? "bg-[var(--accent)] text-white"
                         : "panel rounded-tl-sm"
-                    }`}
+                    } ${m.id.startsWith(PENDING_PREFIX) ? "opacity-70" : ""}`}
                   >
                     {m.content}
                   </div>
