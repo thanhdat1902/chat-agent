@@ -2,34 +2,47 @@
 
 How the system works end to end, and how each question the brief asks is answered in this build.
 
+**Diagrams:** [architecture](#1-architecture) · [turn lifecycle](#2-what-happens-when-someone-sends-a-message) · [scope decision](#4-rules-come-out-of-conversation) · [permission boundary](#5-permissions) · [retrieval and conflict resolution](#6-retrieval--what-reaches-the-model)
+
 ---
 
 ## 1. Architecture
 
-```
-Browser (single page, three panes)
-  │  every request carries the acting user id
-  ▼
-Next.js route handlers ── src/app/api/{state,chat,sessions,memories}
-  │
-  ├─ loadActor(userId) ─────────► user + their team ids            permissions.ts
-  │
-  ├─ WRITE PATH   extractRules ─► persistExtraction                extract.ts / memory.ts
-  │                 │
-  │                 └─ scope decision + confidence → status
-  │
-  ├─ READ PATH    visibilityClause(actor) ─► SQL WHERE predicate   permissions.ts
-  │                 │
-  │                 ├─ scoring (precedence, overlap, recency)      memory.ts
-  │                 ├─ conflict resolution by key                  memory.ts
-  │                 └─ top-12 budget
-  │
-  ├─ buildSystemPrompt(winners) ─► model call                      agent.ts / llm.ts
-  │
-  └─ record message_memories(used) ─► "what shaped this reply"     chat/route.ts
-        │
-        ▼
-     SQLite (libsql) — file locally, Turso when DATABASE_URL is set
+```mermaid
+flowchart TB
+    UI["Browser — sidebar · conversation · memory panel<br/><i>every request carries the acting user id</i>"]
+    API["Next.js route handlers<br/><code>/api/{state,chat,sessions,memories}</code>"]
+    ACTOR["loadActor(userId)<br/><b>permissions.ts</b><br/><i>teams resolved server-side, never trusted from the client</i>"]
+
+    subgraph WRITE ["Write path — a turn may create rules"]
+        EX["extractRules()<br/><b>extract.ts</b>"]
+        SC["scope + confidence<br/>→ active or pending"]
+        PS["persistExtraction()<br/><b>memory.ts</b>"]
+        EX --> SC --> PS
+    end
+
+    subgraph READ ["Read path — what the model is allowed to see"]
+        VC["visibilityClause(actor)<br/><b>permissions.ts</b><br/><i>SQL WHERE predicate</i>"]
+        SCORE["score: precedence · overlap · recency"]
+        CONF["resolve conflicts by key"]
+        BUD["top-12 budget"]
+        VC --> SCORE --> CONF --> BUD
+    end
+
+    PROMPT["buildSystemPrompt(winners)<br/><b>agent.ts</b>"]
+    LLM["model call — <b>llm.ts</b><br/><i>OpenAI or Anthropic</i>"]
+    LINK["record message_memories(used)<br/><i>'what shaped this reply'</i>"]
+    DB[("SQLite via libsql<br/>file locally · Turso hosted")]
+
+    UI --> API --> ACTOR
+    ACTOR --> EX
+    ACTOR --> VC
+    PS --> VC
+    BUD --> PROMPT --> LLM --> LINK
+    LINK --> DB
+    VC -.reads.-> DB
+    PS -.writes.-> DB
+    LINK --> UI
 ```
 
 Four modules carry the whole design:
@@ -46,6 +59,36 @@ Four modules carry the whole design:
 ---
 
 ## 2. What happens when someone sends a message
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant R as /api/chat
+    participant P as permissions.ts
+    participant X as extract.ts
+    participant M as memory.ts
+    participant L as llm.ts
+    participant D as SQLite
+
+    U->>R: message + acting user id
+    R->>P: loadActor(userId)
+    P->>D: user + team memberships
+    R->>R: session must exist AND belong to this user
+    R->>D: INSERT user message
+    R->>P: listVisibleMemories(actor)
+    Note over P,D: SQL predicate — only what this user may see
+    R->>X: extractRules(message, visible)
+    X-->>R: rules + scope + confidence + rationale
+    R->>M: persistExtraction()
+    Note over M: org OR confidence < 0.7 → status = pending<br/>(author-only, injected into nobody's prompt)
+    R->>M: retrieveForTurn(actor)
+    Note over M: filter → score → resolve conflicts → top 12<br/>runs AFTER extraction, so a rule stated<br/>this turn applies to this turn
+    M-->>R: winners only
+    R->>L: system prompt + history
+    L-->>R: reply
+    R->>D: INSERT reply + message_memories(used)
+    R-->>U: reply + which memories shaped it
+```
 
 `POST /api/chat` — `src/app/api/chat/route.ts`, in order:
 
@@ -95,6 +138,32 @@ There is no settings page. The only way a memory is created is by saying somethi
 
 The extractor is given the speaker, their team, the memories they can already see, and one instruction set: decide whether the message contains a **durable rule** — a standing instruction that outlives the current task — as opposed to a question, a one-off request, a fact, or small talk. "Summarise this doc" is a task; "always summarise docs as bullets" is a rule. Most messages produce nothing, and returning nothing is stated as the correct and common answer.
 
+```mermaid
+flowchart TD
+    MSG["User message"] --> RULE{"Contains a durable rule?<br/><i>standing instruction, not a task,<br/>question, fact or small talk</i>"}
+    RULE -->|No — the common case| NOTHING["Store nothing"]
+    RULE -->|Yes| LANG{"What does the language say?"}
+
+    LANG -->|"'everyone', 'company-wide',<br/>'all teams', 'we never…'"| ORG["scope = org"]
+    LANG -->|"'our team', 'we in finance',<br/>'for renewals'"| TEAM["scope = team"]
+    LANG -->|"'give me…', 'I prefer…',<br/>'when you write to me'"| PERS["scope = personal"]
+    LANG -->|No explicit signal| NARROW["narrowest scope that could fit<br/>confidence &lt; 0.7"]
+
+    TEAM --> MEMBER{"Speaker on that team?"}
+    MEMBER -->|No| DOWN["downgrade to personal<br/>reason recorded"]
+    MEMBER -->|Yes| CONF
+
+    ORG --> PENDING
+    NARROW --> PENDING
+    PERS --> CONF{"confidence ≥ 0.7?"}
+    DOWN --> PENDING
+    CONF -->|Yes| ACTIVE["status = active<br/><i>applies immediately</i>"]
+    CONF -->|No| PENDING["status = pending<br/><i>visible to author only,<br/>injected into nobody's prompt</i>"]
+
+    PENDING --> CHIP["One-click chip in the transcript:<br/>Just me · Just Finance · Everyone ·<br/>Everyone (binding) · Discard"]
+    CHIP --> ACTIVE
+```
+
 **Scope is read from the language of the request, not the seniority of the speaker.**
 
 | Signal in the message | Scope |
@@ -125,6 +194,19 @@ Observed behaviour on the live deployment:
 ## 5. Permissions
 
 ### Where the check lives
+
+```mermaid
+flowchart LR
+    REQ["Any read:<br/>agent retrieval · inspector ·<br/>fetch by id · correct · delete"] --> VC["visibilityClause(actor)"]
+    VC --> SQL[("SELECT … WHERE<br/>scope='org'<br/>OR (scope='team' AND team_id IN :actorTeams)<br/>OR (scope='personal' AND owner_user_id = :actor)<br/>AND (status &lt;&gt; 'pending' OR created_by = :actor)")]
+    SQL --> ROWS["Only entitled rows exist<br/>from here on"]
+    ROWS --> PROMPT["System prompt"]
+    ROWS --> PANEL["Memory panel"]
+    ROWS --> PROBE["GET /api/memories/:id"]
+
+    OTHER["A Finance rule, for Mitchell"] -.->|never returned| SQL
+    PROMPT --> NOTE["No 'don't reveal other teams' rules'<br/>instruction exists — there is<br/>nothing in context to reveal"]
+```
 
 One function, `visibilityClause(actor)` in `permissions.ts`, turns the actor into a SQL predicate:
 
@@ -177,6 +259,22 @@ One of those assertions is worth calling out. A colleague trying to ratify someo
 ---
 
 ## 6. Retrieval — what reaches the model
+
+```mermaid
+flowchart TD
+    ALL[("All memories")] --> F["1 · FILTER<br/>visibilityClause + status='active'<br/><i>the security step, in the database, first</i>"]
+    F --> S["2 · SCORE<br/>precedence×1 + confidence×1<br/>+ lexical overlap×4 + recency"]
+    S --> C["3 · RESOLVE CONFLICTS<br/>group by key"]
+    C --> LADDER{"Same key — who wins?"}
+    LADDER -->|"4 · binding org policy"| W["winner"]
+    LADDER -->|"3 · personal"| W
+    LADDER -->|"2 · team"| W
+    LADDER -->|"1 · org default"| W
+    LADDER -->|losers| OUT["reported to the UI as 'overridden'<br/><b>never sent to the model</b>"]
+    W --> B["4 · BUDGET — top 12"]
+    B --> INJ["Injected, tagged with scope + provenance<br/><i>'Ryan set this, Aug 7'</i>"]
+    B --> DROP["dropped_for_budget<br/><i>reported, not silently truncated</i>"]
+```
 
 Stuffing every memory into context does not survive contact with a real store, so retrieval is four steps (`retrieveForTurn`):
 
