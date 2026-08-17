@@ -34,7 +34,7 @@ function rawClient(): Client {
   return _client;
 }
 
-const SCHEMA = [
+export const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS users (
      id TEXT PRIMARY KEY,
      name TEXT NOT NULL,

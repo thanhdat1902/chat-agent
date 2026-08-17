@@ -689,3 +689,42 @@ export async function seedIfEmpty(c: Client): Promise<void> {
 
   await c.batch(stmts, "write");
 }
+
+/**
+ * Blank slate: the four users, their teams, and one empty chat each — no
+ * memories, no transcripts. For working through TESTING.md from scratch and
+ * watching each rule get created as you go.
+ *
+ * `seedIfEmpty` skips once users exist, so the app will not re-add the demo
+ * data on top of this.
+ */
+export async function seedBlank(c: Client): Promise<void> {
+  const stmts: { sql: string; args: (string | number | null)[] }[] = [];
+
+  for (const u of USERS) {
+    stmts.push({
+      sql: `INSERT OR IGNORE INTO users (id, name, role, color) VALUES (?,?,?,?)`,
+      args: [u.id, u.name, u.role, u.color],
+    });
+  }
+  for (const t of TEAMS) {
+    stmts.push({
+      sql: `INSERT OR IGNORE INTO teams (id, name) VALUES (?,?)`,
+      args: [t.id, t.name],
+    });
+  }
+  for (const m of MEMBERSHIPS) {
+    stmts.push({
+      sql: `INSERT OR IGNORE INTO team_members (team_id, user_id) VALUES (?,?)`,
+      args: [m.team_id, m.user_id],
+    });
+  }
+  for (const u of USERS) {
+    stmts.push({
+      sql: `INSERT OR IGNORE INTO sessions (id, user_id, title, seq, created_at) VALUES (?,?,?,?,?)`,
+      args: [`s_${u.id.replace("u_", "")}_1`, u.id, "Chat session #1 — New chat", 1, daysAgo(0)],
+    });
+  }
+
+  await c.batch(stmts, "write");
+}

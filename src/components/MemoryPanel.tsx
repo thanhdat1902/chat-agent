@@ -13,15 +13,6 @@ export type RequestConfirm = (
 
 type Tab = "memory" | "precedence" | "leak";
 
-/** Fixed seed ids, so the probe can ask for a memory it is not entitled to. */
-const PROBE_TARGETS = [
-  { id: "mem_fin_pricing", label: "Finance · Q3 pricing sheet rule (Ryan)" },
-  { id: "mem_fin_delta", label: "Finance · renewal delta rule (Sean)" },
-  { id: "mem_ops_escalation", label: "Operations · escalation routing (Daniel)" },
-  { id: "mem_daniel_bullets", label: "Personal · Daniel's bullets preference" },
-  { id: "mem_org_dates", label: "Org · no dates without eng sign-off (Ryan)" },
-  { id: "mem_pending_cc", label: "Pending proposal · Mitchell's CC rule" },
-];
 
 export default function MemoryPanel({
   state,
@@ -399,8 +390,13 @@ interface ProbeResult {
 }
 
 function LeakTest({ state }: { state: AppState }) {
-  const [target, setTarget] = useState(PROBE_TARGETS[0].id);
-  const [asUser, setAsUser] = useState("u_mitchell");
+  // Probe targets are the memories the CURRENT actor can see. That is the
+  // honest shape of the test: "I can read this — can they?" It also means the
+  // panel works on a blank database, where no fixed seed ids exist.
+  const targets = state.memories;
+  const [target, setTarget] = useState(targets[0]?.id ?? "");
+  const others = state.users.filter((u) => u.id !== state.actor.id);
+  const [asUser, setAsUser] = useState(others[0]?.id ?? state.actor.id);
   const [result, setResult] = useState<ProbeResult | null>(null);
   const [running, setRunning] = useState(false);
 
@@ -426,19 +422,28 @@ function LeakTest({ state }: { state: AppState }) {
 
       <label className="block">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
-          Memory
+          Memory {state.actor.name} can see
         </span>
-        <select
-          value={target}
-          onChange={(e) => setTarget(e.target.value)}
-          className="mt-1 w-full rounded border border-[var(--line)] px-2 py-1.5 text-[12px]"
-        >
-          {PROBE_TARGETS.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.label}
-            </option>
-          ))}
-        </select>
+        {targets.length === 0 ? (
+          <p className="mt-1 rounded border border-dashed border-[var(--line)] px-2 py-2 text-[12px] text-[var(--muted)]">
+            {state.actor.name} has no memories yet. Create one in chat, then probe it.
+          </p>
+        ) : (
+          <select
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+            className="mt-1 w-full rounded border border-[var(--line)] px-2 py-1.5 text-[12px]"
+          >
+            {targets.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.scope === "team" ? `Team · ${m.teamName}` : m.scope === "org" ? "Org" : "Personal"}
+                {" — "}
+                {m.content.slice(0, 52)}
+                {m.content.length > 52 ? "…" : ""}
+              </option>
+            ))}
+          </select>
+        )}
       </label>
 
       <label className="block">
@@ -460,7 +465,7 @@ function LeakTest({ state }: { state: AppState }) {
 
       <button
         onClick={run}
-        disabled={running}
+        disabled={running || !target}
         className="w-full rounded-md bg-[var(--accent)] px-3 py-2 text-[13px] font-medium text-white disabled:opacity-50"
       >
         {running ? "Running…" : "Run probe"}

@@ -6,9 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "seed": "tsx scripts/reseed.ts",
     "verify": "tsx scripts/verify.mts",
-    "smoke": "bash scripts/smoke.sh"
+    "smoke": "bash scripts/smoke.sh",
+    "reset": "tsx scripts/reset.mts",
+    "reset:blank": "tsx scripts/reset.mts --blank"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.0",
