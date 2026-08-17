@@ -12,7 +12,7 @@
  */
 import { createClient } from "@libsql/client";
 import { SCHEMA } from "../src/lib/db";
-import { seedBlank } from "../src/lib/seed";
+import { blankSeedStatements } from "../src/lib/seed";
 
 const blank = process.argv.includes("--blank");
 const url = process.env.DATABASE_URL ?? "file:./data/memory.db";
@@ -31,19 +31,37 @@ const tables = [
 ];
 
 console.log(`resetting ${url.replace(/\/\/.*@/, "//")}  (${blank ? "blank slate" : "full demo seed"})`);
-for (const t of tables) await client.execute(`DROP TABLE IF EXISTS ${t}`);
-console.log(`  dropped ${tables.length} tables`);
 
 if (blank) {
-  // Build the schema and the minimal data here, so the app's own seed sees
-  // users already present and does not layer the demo data on top.
-  for (const stmt of SCHEMA) await client.execute(stmt);
-  await seedBlank(client);
-  const n = await client.execute("SELECT COUNT(*) AS n FROM users");
-  const s = await client.execute("SELECT COUNT(*) AS n FROM sessions");
-  console.log(`  seeded ${n.rows[0].n} users, ${s.rows[0].n} empty chats, 0 memories`);
+  /**
+   * Drop, rebuild and seed in ONE transaction.
+   *
+   * Doing these as separate statements against a live deployment loses a race:
+   * any request landing in the gap hits a missing table, the app's self-heal
+   * re-runs initialisation, and `seedIfEmpty` lays down the *demo* data — after
+   * which the blank inserts no-op on their ids and the reset silently produces
+   * the opposite of what was asked for. A single batch leaves no gap.
+   */
+  await client.batch(
+    [
+      ...tables.map((t) => ({ sql: `DROP TABLE IF EXISTS ${t}`, args: [] })),
+      ...SCHEMA.map((sql) => ({ sql, args: [] })),
+      ...blankSeedStatements(),
+    ],
+    "write",
+  );
+  const [u, s, m] = await Promise.all([
+    client.execute("SELECT COUNT(*) AS n FROM users"),
+    client.execute("SELECT COUNT(*) AS n FROM sessions"),
+    client.execute("SELECT COUNT(*) AS n FROM memories"),
+  ]);
+  console.log(
+    `  seeded ${u.rows[0].n} users, ${s.rows[0].n} empty chats, ${m.rows[0].n} memories`,
+  );
   console.log("\nBlank slate ready. Every rule you see from here you created.");
   console.log("Restore the demo data with:  npm run reset");
 } else {
+  for (const t of tables) await client.execute(`DROP TABLE IF EXISTS ${t}`);
+  console.log(`  dropped ${tables.length} tables`);
   console.log("  the next request rebuilds the schema and reseeds the demo");
 }

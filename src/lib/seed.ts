@@ -788,7 +788,10 @@ export async function seedIfEmpty(c: Client): Promise<void> {
  * `seedIfEmpty` skips once users exist, so the app will not re-add the demo
  * data on top of this.
  */
-export async function seedBlank(c: Client): Promise<void> {
+export function blankSeedStatements(): {
+  sql: string;
+  args: (string | number | null)[];
+}[] {
   const stmts: { sql: string; args: (string | number | null)[] }[] = [];
 
   for (const u of USERS) {
@@ -817,6 +820,9 @@ export async function seedBlank(c: Client): Promise<void> {
   }
   // Documents are the world, not memory — present in both modes, scoped either way.
   stmts.push(...documentStatements());
+  return stmts;
+}
 
-  await c.batch(stmts, "write");
+export async function seedBlank(c: Client): Promise<void> {
+  await c.batch(blankSeedStatements(), "write");
 }
