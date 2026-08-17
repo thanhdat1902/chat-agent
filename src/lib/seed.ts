@@ -79,7 +79,10 @@ export const DOCUMENTS = [
     scope: "team" as const,
     team: "t_ops",
     title: "Implementation runbook",
-    summary: "Rollout sequence and the on-call escalation rota. Operations only.",
+    summary: "Rollout sequence and the contact list. Operations only.",
+    // Same rule as the account book: procedures and contacts, never routing
+    // policy. "Page on-call, never an engineering manager" is a rule, and a
+    // document asserting it would answer the question a rule should answer.
     body: [
       "Mid-market rollout sequence:",
       "1. Kickoff call and environment questionnaire",
@@ -87,7 +90,7 @@ export const DOCUMENTS = [
       "3. Data import dry run, then pilot group",
       "4. Full cutover, then a 30-day check-in",
       "",
-      "Overnight failures page the on-call rotation, never an engineering manager directly.",
+      "Contacts: on-call rotation, the implementation lead, and the account owner.",
     ].join("\n"),
     created_by: "u_daniel",
     daysAgo: 20,
