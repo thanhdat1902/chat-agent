@@ -22,24 +22,35 @@ retrieval, and conflict resolution never call a model, so they behave identicall
 
 ## Storage
 
-`DATABASE_URL` is what makes state durable across serverless instances. Without it the
-deployment seeds a fresh database per instance: the seeded users, sessions, and memories are
-present everywhere and every demo works, but a chat sent to one instance is not visible to
-another. Three commands fix it:
+The live deployment runs on **Turso** (`libsql://studyfetch-demo-…`), so state is durable and
+shared across serverless instances: a chat sent to one instance is readable from every other,
+and newly extracted memories survive a refresh.
+
+`DATABASE_URL` is what makes that true. Without it the deployment falls back to `/tmp` and
+seeds a fresh database per instance — every demo still works, because the seed is identical
+everywhere, but a chat sent to one instance is invisible to another.
+
+To point at a different database:
 
 ```bash
 turso db create org-agent-memory
 turso db show org-agent-memory --url        # -> libsql://…
 turso db tokens create org-agent-memory     # -> token
-```
-
-Then set both values on the project and redeploy:
-
-```bash
 vercel env add DATABASE_URL production
 vercel env add DATABASE_AUTH_TOKEN production
 vercel --prod
 ```
+
+### Resetting the demo
+
+```bash
+set -a; . ./.env; set +a
+node scripts/reset.mjs
+```
+
+Drops every table; the next request rebuilds the schema and reseeds. Safe to run against a
+live deployment — a warm instance that has already memoized "schema ready" detects the
+missing tables, re-runs initialisation once, and serves the request rather than failing.
 
 ## Deploy
 

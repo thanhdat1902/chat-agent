@@ -4,7 +4,7 @@ Four users — Ryan and Sean on Finance, Daniel and Mitchell on Operations — s
 
 **Live:** https://chat-agent-sand.vercel.app — seeded so both required demos are one click away from the empty sessions.
 
-**Run it:** `npm install && npm run dev`. Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` (whichever is present wins, OpenAI first); with neither, a deterministic extractor and a reporting agent keep the permission behaviour demonstrable. SQLite lives at `data/memory.db` and seeds itself on first request; set `DATABASE_URL`/`DATABASE_AUTH_TOKEN` for a hosted Turso database. `npm run verify` runs 26 assertions against the memory layer, `npm run smoke` runs 15 over HTTP against any deployment, and `node scripts/demo.mjs <base-url>` replays every demo. A full walkthrough of the pipeline is in [PIPELINE.md](PIPELINE.md).
+**Run it:** `npm install && npm run dev`. Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` (whichever is present wins, OpenAI first); with neither, a deterministic extractor and a reporting agent keep the permission behaviour demonstrable. SQLite lives at `data/memory.db` locally and seeds itself on first request; the live deployment runs the same client against Turso via `DATABASE_URL`/`DATABASE_AUTH_TOKEN`, so state is durable and shared across serverless instances. `npm run verify` runs 26 assertions against the memory layer, `npm run smoke` runs 15 over HTTP against any deployment, and `node scripts/demo.mjs <base-url>` replays every demo. A full walkthrough of the pipeline is in [PIPELINE.md](PIPELINE.md).
 
 ### Memory schema
 
