@@ -115,10 +115,18 @@ SCOPE DECISION — read the language, not the speaker's seniority.
 If the message carries no explicit signal, choose the NARROWEST scope that could be right and set scope_confidence below 0.7. Never widen on a hunch: an over-wide guess is corrected by a human, but only after it has already been proposed, so it must be flagged as uncertain.
 Someone can only set a team rule for their own team (${team}). If they name a different team, treat it as personal with low confidence and say so in the rationale.
 
-SUPERSESSION
-These rules are already stored and visible to this user:
+KEYS — THIS IS HOW CONFLICTS ARE DETECTED
+The key groups rules that answer the same question. Two rules sharing a key are treated as competing, and a precedence ladder decides which one applies; two rules with different keys both apply. So the key is not a label, it is a claim about what the rule governs.
+
+Already stored and visible to this user:
 ${known}
-If a new rule contradicts or updates one of them, put that memory's id in supersedes_id and reuse its key. Otherwise use an empty string. Do not re-extract a rule that is already stored in the same form — return it only if the wording meaningfully changes it.
+
+If the new rule governs the same aspect of behaviour as one of those — response format, which pricing source to use, committing dates, tone, who must approve something — reuse that memory's EXACT key, character for character. Do this even when the new rule does not replace the old one and even when the two are compatible. "Reply in bullets" and "end with a summary paragraph" both govern response format and must share a key; if they did not, both would be applied and the disagreement would never surface.
+
+Only invent a new key for genuinely new territory. Prefer a short dotted form: format.style, pricing.source, policy.dates, comms.tone, approval.threshold.
+
+SUPERSESSION
+If the new rule contradicts or updates a stored one so that the old one should stop applying entirely, put that memory's id in supersedes_id. Otherwise use an empty string — sharing a key is enough for the ladder to arbitrate; supersession is for retiring a rule outright. Do not re-extract a rule already stored in the same form; return it only if the wording meaningfully changes it.
 
 Return only the rules you actually find. Most messages contain zero. Returning nothing is the correct and common answer.`;
 }
