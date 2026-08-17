@@ -2,6 +2,7 @@ import { all, id, nowIso, run } from "./db";
 import {
   assertCanMutate,
   assertCanWrite,
+  getMemoryAs,
   HttpError,
   listRetrievableMemories,
   ORG_ID,
@@ -211,12 +212,60 @@ export function decideStatus(scope: Scope, confidence: number): Memory["status"]
   return "active";
 }
 
+/**
+ * Supersession carries the authority of a write: retiring a memory removes it
+ * from retrieval for everyone it applied to, and a superseded row never
+ * reaches the precedence ladder at all. So it cannot be granted on the
+ * extractor's say-so — a model that decides a personal preference "replaces"
+ * a company policy would otherwise disable that policy org-wide.
+ *
+ * A memory may only supersede one at its own scope, that the actor could have
+ * authored, and never a binding org policy. Anything else is ignored rather
+ * than thrown: both memories are kept and the precedence ladder arbitrates,
+ * which is the safe outcome. The refusal is recorded in the audit trail.
+ */
+async function permittedSupersession(
+  actor: Actor,
+  scope: Scope,
+  supersedesId: string | null | undefined,
+): Promise<{ allowed: string | null; refused: string | null; reason: string }> {
+  if (!supersedesId) return { allowed: null, refused: null, reason: "" };
+
+  const target = await getMemoryAs(actor, supersedesId);
+  if (!target) {
+    return { allowed: null, refused: supersedesId, reason: "target not visible to this user" };
+  }
+  if (target.binding) {
+    return {
+      allowed: null,
+      refused: supersedesId,
+      reason: "target is a binding organization policy and cannot be retired this way",
+    };
+  }
+  if (target.scope !== scope) {
+    return {
+      allowed: null,
+      refused: supersedesId,
+      reason: `a ${scope} memory cannot supersede a ${target.scope} memory`,
+    };
+  }
+  if (scope === "team" && !actor.teamIds.includes(target.team_id ?? "")) {
+    return { allowed: null, refused: supersedesId, reason: "target belongs to another team" };
+  }
+  if (scope === "personal" && target.owner_user_id !== actor.user.id) {
+    return { allowed: null, refused: supersedesId, reason: "target belongs to another user" };
+  }
+  return { allowed: supersedesId, refused: null, reason: "" };
+}
+
 export async function writeMemory(
   actor: Actor,
   input: WriteMemoryInput,
 ): Promise<Memory> {
   const teamId = input.scope === "team" ? (actor.teamIds[0] ?? null) : null;
   assertCanWrite(actor, input.scope, teamId);
+
+  const supersede = await permittedSupersession(actor, input.scope, input.supersedesId);
 
   const status = input.forceStatus ?? decideStatus(input.scope, input.confidence);
   const now = input.createdAt ?? nowIso();
@@ -246,7 +295,7 @@ export async function writeMemory(
       input.quote,
       now,
       now,
-      input.supersedesId ?? null,
+      supersede.allowed,
       status === "pending" ? input.scope : null,
     ],
   );
@@ -258,12 +307,19 @@ export async function writeMemory(
     `${input.scope} · ${input.rationale}`,
   );
 
-  if (input.supersedesId) {
+  if (supersede.allowed) {
     await run(`UPDATE memories SET status = 'superseded', updated_at = ? WHERE id = ?`, [
       now,
-      input.supersedesId,
+      supersede.allowed,
     ]);
-    await logEvent(input.supersedesId, actor.user.id, "superseded", `Replaced by ${memoryId}`);
+    await logEvent(supersede.allowed, actor.user.id, "superseded", `Replaced by ${memoryId}`);
+  } else if (supersede.refused) {
+    await logEvent(
+      memoryId,
+      actor.user.id,
+      "supersession refused",
+      `Wanted to replace ${supersede.refused} — ${supersede.reason}. Both kept; precedence decides.`,
+    );
   }
 
   const created = await requireMemory(actor, memoryId);
