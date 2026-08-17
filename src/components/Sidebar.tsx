@@ -17,7 +17,7 @@ export default function Sidebar({
     <aside className="flex w-[300px] shrink-0 flex-col border-r border-[var(--line)] bg-white">
       <div className="border-b border-[var(--line)] px-4 py-3">
         <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
-          Metalinked
+          Agent Memory
         </div>
         <div className="mt-2 flex items-center gap-2">
           <label className="text-xs text-[var(--muted)]">Acting as</label>

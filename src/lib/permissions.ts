@@ -2,7 +2,8 @@ import type { InValue } from "@libsql/client";
 import { all, one } from "./db";
 import type { Actor, Memory, Scope, User } from "./types";
 
-export const ORG_ID = "org_metalinked";
+/** Single organization in this prototype; the column exists so the boundary is real. */
+export const ORG_ID = "org_main";
 
 /**
  * ============================================================================

@@ -25,7 +25,7 @@ export function buildSystemPrompt(
   authors: Map<string, string>,
 ): string {
   const teamName = actor.teamNames[0] ?? "no team";
-  const header = `You are the workplace assistant for ${actor.user.name} (${actor.user.role}) at Metalinked, on the ${teamName} team.
+  const header = `You are the workplace assistant for ${actor.user.name} (${actor.user.role}), on the ${teamName} team.
 
 Answer the way a sharp colleague would: get to the point, be concrete, and use the team's own vocabulary. Keep replies short unless the question needs depth.`;
 
