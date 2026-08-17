@@ -54,6 +54,15 @@ right rail for everyone.
 | Right rail → **Precedence** | The ladder plus live conflicts for this user |
 | Right rail → **Leak test** | Pick a memory *you* can see, ask whether someone else can |
 
+**The account book.** Every user also sees a small shared reference table — three accounts with
+seats, prior-term value, a Q3 pricing sheet figure, a public rate card figure, renewal date and
+notes. It is **reference data, not memory**: identical for everyone, present in both seed modes,
+and never scoped. That is deliberate — because the data is constant, any difference between two
+users' answers is attributable to the memories they hold and nothing else. It also gives rules
+something concrete to act on: a rule naming the Q3 sheet only demonstrates something if both
+figures are available. The book explicitly states that *which* pricing source applies is team
+policy and cannot be inferred from the table.
+
 **One expectation to set:** the agent's wording changes run to run. What is stable — and what you
 should actually check — is the **scope**, the **status**, which memories were **injected**, and
 which were **overridden**. Those come from SQL and TypeScript, not from the model.
@@ -208,8 +217,13 @@ As **Sean** (Finance):
 How should I price the Northwind renewal?
 ```
 
-**Expected:** the reply uses the **Q3 pricing sheet, not the public rate card**. Sean never typed
-that rule — Ryan did, in a different chat.
+**Expected: a concrete number.** Something like:
+
+> Price **Northwind** off the **Q3 pricing sheet**: **$87,400**
+> Prior term: **$84,000** · Dollar delta: **+$3,400** · Seats: 240 · Renews 2026-09-30
+
+Sean never typed that rule — Ryan did, in a different chat. Note both Finance rules firing at
+once: *which sheet* to quote, and *show the delta*.
 
 ### 3.3 The other team does not
 
@@ -219,8 +233,15 @@ As **Mitchell** (Operations), **the identical message**:
 How should I price the Northwind renewal?
 ```
 
-**Expected:** generic renewal advice. **No mention of the Q3 pricing sheet.** Mitchell's memory
-panel shows only the org rule from Act 2 — no Finance rules at all.
+**Expected: he refuses to pick a price.** Something like:
+
+> For **Northwind** I wouldn't pick a price yet — I don't know which pricing source applies and
+> that needs confirming. Known figures: seats **240**, prior term **$84,000**, Q3 pricing sheet
+> **$87,400**, public rate card **$91,200**.
+
+**This is the sharpest moment in the whole guide.** Mitchell can see the exact same figures Sean
+saw — the account book is identical for both. What he does not have is the rule that says which
+column to quote. Same data, same question, same code; only the memories differ.
 
 > Both requests run the same code. The only difference is one SQL predicate:
 > ```sql

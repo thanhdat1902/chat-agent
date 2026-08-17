@@ -361,8 +361,14 @@ Ryan's Finance rule — *"quote renewals off the Q3 pricing sheet, not the publi
 
 | | Reply |
 |---|---|
-| **Sean** (Finance) | *"Price it off the Q3 pricing sheet, not the public rate card…"* plus the dollar delta the second Finance rule requires |
-| **Mitchell** (Operations) | Generic renewal mechanics — current ARR, uplift clause, segment norms. No mention of the Q3 sheet. |
+| **Sean** (Finance) | *"Price **Northwind** off the **Q3 pricing sheet**: **$87,400**. Prior term $84,000, dollar delta **+$3,400**"* — both Finance rules firing: which sheet, and show the delta |
+| **Mitchell** (Operations) | *"I wouldn't pick a price yet — I don't know which pricing source applies and that needs confirming."* Then lists the raw figures. |
+
+Both users see the **same account book** — an unscoped reference table carrying seats, prior-term
+value, the Q3 sheet figure and the public rate card figure. Mitchell is looking at the exact
+number Sean quoted. What he lacks is the rule that says which column is the one to use, so he
+declines to choose. Holding the data constant is what makes the difference attributable to memory
+and nothing else.
 
 Mitchell's memory panel shows no Finance memories, the leak probe returns 404 for him, and the direct extraction attempt in §5 gets nothing.
 
