@@ -40,14 +40,23 @@ async function say(userId, sessionId, content) {
   }
 }
 
-// Seeded empty sessions — present in every instance, so this works with or
-// without a shared database. Pass --new to exercise freshly created sessions.
-const SEEDED = {
-  u_ryan: "s_ryan_4",
-  u_sean: "s_sean_3",
-  u_daniel: "s_daniel_3",
-  u_mitchell: "s_mitchell_3",
-};
+/**
+ * Resolve each user's empty chat from the live state rather than assuming seed
+ * ids, so this works against a blank slate, the demo seed, or a database where
+ * sessions have been created and deleted.
+ */
+async function emptySessionFor(userId) {
+  const s = await (await fetch(`${BASE}/api/state?userId=${userId}`)).json();
+  const sessions = s.sessionsByUser?.[userId] ?? [];
+  for (const sess of sessions.slice().reverse()) {
+    const full = await (
+      await fetch(`${BASE}/api/state?userId=${userId}&sessionId=${sess.id}`)
+    ).json();
+    if ((full.messages ?? []).length === 0) return sess.id;
+  }
+  return newSession(userId); // none empty — make one
+}
+
 const useNew = process.argv.includes("--new");
 
 const cases = [
@@ -69,5 +78,5 @@ const cases = [
 
 for (const [label, user, prompt] of cases) {
   console.log(`\n### ${label}`);
-  await say(user, useNew ? await newSession(user) : SEEDED[user], prompt);
+  await say(user, useNew ? await newSession(user) : await emptySessionFor(user), prompt);
 }

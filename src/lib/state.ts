@@ -28,6 +28,14 @@ export interface AppState {
   ladder: typeof PRECEDENCE_LADDER;
   modelConfigured: boolean;
   modelLabel: string;
+  /**
+   * Where the "Run the guided demo" button should jump: an empty chat
+   * belonging to someone who already has memories to demonstrate. Computed,
+   * never hardcoded, so it survives a reseed, a blank slate, or a user
+   * deleting the session it used to point at. Null when there is nothing to
+   * demonstrate yet.
+   */
+  demoEntry: { userId: string; sessionId: string; userName: string } | null;
 }
 
 /**
@@ -155,7 +163,34 @@ export async function loadState(
     ladder: PRECEDENCE_LADDER,
     modelConfigured: activeProvider() !== "none",
     modelLabel: modelLabel(),
+    demoEntry: await findDemoEntry(users, sessionsByUser),
   };
+}
+
+/**
+ * An empty chat belonging to a user who would actually see something — i.e.
+ * at least one active memory authored by somebody else. On a blank database
+ * that is nobody, and the button hides itself.
+ */
+async function findDemoEntry(
+  users: UserWithTeams[],
+  sessionsByUser: Record<string, ChatSession[]>,
+): Promise<AppState["demoEntry"]> {
+  const counts = await all<{ session_id: string; n: number }>(
+    `SELECT session_id, COUNT(*) AS n FROM messages GROUP BY session_id`,
+  );
+  const messageCount = new Map(counts.map((c) => [c.session_id, Number(c.n)]));
+
+  for (const u of users) {
+    const empty = (sessionsByUser[u.id] ?? []).find((s) => !messageCount.get(s.id));
+    if (!empty) continue;
+    const visible = await listVisibleMemories(toActor(u));
+    const inherited = visible.filter((m) => m.status === "active" && m.created_by !== u.id);
+    if (inherited.length > 0) {
+      return { userId: u.id, sessionId: empty.id, userName: u.name };
+    }
+  }
+  return null;
 }
 
 export async function loadMessages(sessionId: string): Promise<Message[]> {
@@ -186,4 +221,28 @@ export async function loadMessages(sessionId: string): Promise<Message[]> {
     used_memory_ids: used.get(r.id) ?? [],
     created_memory_ids: created.get(r.id) ?? [],
   }));
+}
+
+/**
+ * The landing target: the first user, and whichever of their chats has the
+ * most messages — the conversation with the most context to read. On an empty
+ * database this is simply their only chat.
+ */
+export async function pickLandingSession(): Promise<{
+  userId: string;
+  sessionId: string | null;
+}> {
+  const [users, sessions, counts] = await Promise.all([
+    all<User>(`SELECT id FROM users ORDER BY rowid LIMIT 1`),
+    all<ChatSession>(`SELECT * FROM sessions ORDER BY seq`),
+    all<{ session_id: string; n: number }>(
+      `SELECT session_id, COUNT(*) AS n FROM messages GROUP BY session_id`,
+    ),
+  ]);
+  const userId = users[0]?.id ?? "u_ryan";
+  const mine = sessions.filter((s) => s.user_id === userId);
+  if (mine.length === 0) return { userId, sessionId: null };
+  const n = new Map(counts.map((c) => [c.session_id, Number(c.n)]));
+  const richest = [...mine].sort((a, b) => (n.get(b.id) ?? 0) - (n.get(a.id) ?? 0))[0];
+  return { userId, sessionId: richest.id };
 }
