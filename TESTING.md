@@ -170,7 +170,9 @@ Switch to **Sean** (click his chat):
 Can you tell Acme the SSO integration will be live on September 30?
 ```
 
-**Expected:** the agent gives the date happily — Ryan's unconfirmed rule is not in Sean's panel.
+**Expected: it shares the date.** Something like *"Our current internal delivery plan targets
+September 30 for SSO"* — it may still hedge the wording (the model dislikes hard commitments on
+its own), but it passes the date along and says nothing about engineering sign-off.
 
 Sean does already have **1 memory**: the Finance team rule from 2.1. Ryan wrote it, Sean is on
 Finance, so it reached him with no action from either of them — team inheritance, two acts before
@@ -188,12 +190,20 @@ Back to **Ryan**, click **`Everyone · binding policy`**.
 
 **Expected:** the chip becomes `ORG · BINDING` · `active`.
 
+> **Choose `Everyone · binding policy`, not plain `Everyone`.** Act 4.4 tests that a binding
+> policy outranks a personal preference. Ratified as a plain org default it scores `1`, *below*
+> personal's `3`, so 4.4 would show the personal rule winning — the opposite result, and it would
+> look like a bug when it is the ladder working correctly.
+
 Switch to **Sean** and ask the same question as 2.3.
 
-**Expected: the agent now refuses the date** — something like *"I can't promise Acme a live date
-without engineering sign-off"* — and offers compliant wording for both cases (signed off, and not
-yet). The reply now reports **2 memories shaped this reply**, the new one tagged `ORG · BINDING`
-and attributed to *"Ryan set this, \<today\>"*.
+**Expected: it refuses** — *"No — don't promise Sept 30 unless **Engineering has signed off**"* —
+and offers compliant wording. The reply reports **2 memories shaped this reply**, the new one
+tagged `ORG · BINDING` and attributed to *"Ryan set this, \<today\>"*.
+
+> **The precise tell is the phrase "engineering sign-off".** It appears only once the rule is
+> active — that language exists nowhere in the documents, so it can only have come from memory.
+> The injected count going 1 → 2 is the other half of the proof.
 
 > **This is Demo 1 from the brief**, built by hand: Ryan set a rule in his own chat, Sean never
 > saw it, and Sean's agent follows it with no reminder. `confirmMemory()` only flipped the status

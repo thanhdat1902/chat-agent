@@ -41,11 +41,14 @@ export const DOCUMENTS = [
     team: null,
     title: "Account book",
     summary: "Customers, seats, prior-term value, public list pricing and renewal dates.",
+    // Notes state facts only. Whether a plan date may be promised to a customer
+    // is policy, and policy lives in memory — a document that says "engineering
+    // has not signed off" pre-empts the very rule the demo is meant to prove.
     body: [
       "| Account | Seats | Prior term | Public rate card | Renews | Notes |",
       "|---|---|---|---|---|---|",
-      "| Northwind | 240 | $84,000 | $91,200 | 2026-09-30 | SSO integration requested; in the engineering backlog with no committed date. |",
-      "| Acme | 150 | $52,000 | $58,000 | 2026-10-12 | Asking when SSO ships. Engineering has not signed off on a date. |",
+      "| Northwind | 240 | $84,000 | $91,200 | 2026-09-30 | SSO integration requested; the internal delivery plan currently targets 30 September. |",
+      "| Acme | 150 | $52,000 | $58,000 | 2026-10-12 | Asking when SSO ships; the internal delivery plan currently targets 30 September. |",
       "| Contoso | 600 | $128,000 | $142,500 | 2027-01-31 | Expanding into two more regions next term; wants volume pricing. |",
     ].join("\n"),
     created_by: "u_ryan",
