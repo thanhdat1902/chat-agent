@@ -7,6 +7,17 @@ you created — nothing is pre-seeded, so there is no ambiguity about where anyt
 
 Run the acts **in order**: each one creates the rules the next one tests.
 
+> **Test against the live URL, not `npm run dev`.** Your `.env` sets `DATABASE_URL`, and Next
+> loads `.env` in development too — so a local server reads and writes the *same* Turso database
+> as production. Running locally gains you nothing here and risks two servers mutating one
+> database. For a genuinely isolated local run, comment out `DATABASE_URL` and
+> `DATABASE_AUTH_TOKEN` first; the app falls back to `data/memory.db` on your disk.
+
+> **This guide is for the blank slate, not for recording.** After `npm run reset` the demo data
+> is already in place, so these acts would collide with it — Act 3.1 recreates a rule that
+> already exists, and the memory counts stop matching. For the recording, see
+> [Act 7](#act-7--restore-the-demo-data-for-recording).
+
 ---
 
 ## Act 0 — Start clean
@@ -414,7 +425,7 @@ regardless of what the client sends.
 
 ---
 
-## Act 7 — Restore the demo data
+## Act 7 — Restore the demo data, for recording
 
 ```bash
 npm run reset
@@ -423,7 +434,24 @@ npm run reset
 **Expected:** the seeded organization is back — four users with several chats each, real
 transcripts, and the memories that make both required demos work on first load.
 
-This is the state to leave it in for a reviewer or a recording.
+**Do not re-run Acts 1–6 against this state.** They were written for an empty database and will
+collide with the seeded rules. The seeded demo needs no typing at all — that is the point of it,
+and it is what the brief asks for ("reviewers should not need to configure the demos themselves").
+
+A five-minute walkthrough on the seeded data:
+
+| Step | Action | What it shows |
+|---|---|---|
+| 1 | Open the app | Lands on Ryan's session #2 — the conversation where he sets the org rule, days ago |
+| 2 | Sidebar → **Run the guided demo →** | Jumps to Sean's empty chat |
+| 3 | Click the first demo card | **Demo 1** — Sean refuses the date, following a rule he never saw. Click *"N memories shaped this reply"* to show it attributed to Ryan |
+| 4 | Click the second demo card | **Demo 2a** — Sean gets the Q3 pricing sheet |
+| 5 | Sidebar → Mitchell's chat → same card | **Demo 2b** — same question, no Q3 sheet. His memory panel has no Finance rules |
+| 6 | Right rail → **Leak test** | Probe the Finance rule as Mitchell → 404, with the SQL predicate printed |
+| 7 | Sidebar → Daniel → **Precedence** tab | The ladder, and his personal rule beating the org default |
+| 8 | Talk over [PIPELINE.md](PIPELINE.md) | The five diagrams: architecture, turn lifecycle, scope decision, permission boundary, retrieval |
+
+Reset again between takes with `npm run reset`.
 
 ---
 
@@ -431,9 +459,12 @@ This is the state to leave it in for a reviewer or a recording.
 
 Everything above is asserted in code too — these do not need the UI.
 
+Run the smoke suite after each act — it discovers what exists and reports which permission
+properties are now provable, skipping the rest. Skips turn into passes as you create rules.
+
 ```bash
 npm run verify                                   # 40 assertions, no HTTP layer
-BASE=https://chat-agent-sand.vercel.app npm run smoke    # 15 assertions over HTTP
+BASE=https://chat-agent-sand.vercel.app npm run smoke    # adapts to whatever state you are in
 MUTATE=1 BASE=http://localhost:3737 npm run smoke        # adds correct / ratify / delete
 node scripts/demo.mjs https://chat-agent-sand.vercel.app # replays every demo, prints replies
 ```
