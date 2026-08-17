@@ -57,6 +57,24 @@ export const DOCUMENTS = [
     daysAgo: 45,
   },
   {
+    id: "doc_roadmap",
+    scope: "org" as const,
+    team: null,
+    title: "Product roadmap",
+    summary: "Target dates for in-flight engineering work. Org-wide.",
+    // Dates are facts. Whether a target may be promised to a customer is
+    // policy, and policy lives in memory — this document must never say.
+    body: [
+      "| Item | Target date | Stage |",
+      "|---|---|---|",
+      "| SSO integration | 30 September | Build |",
+      "| Bulk data loader | 15 November | Design |",
+      "| Regional failover | Q1 next year | Scoping |",
+    ].join("\n"),
+    created_by: "u_ryan",
+    daysAgo: 40,
+  },
+  {
     id: "doc_q3_pricing",
     scope: "team" as const,
     team: "t_finance",
