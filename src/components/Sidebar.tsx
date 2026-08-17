@@ -37,6 +37,15 @@ export default function Sidebar({
           Everyone&apos;s chats are listed. Opening someone else&apos;s session switches you to
           them — memory visibility always follows whoever you are acting as.
         </p>
+        <button
+          onClick={() => onSelectSession("u_sean", "s_sean_3")}
+          className="mt-2.5 w-full rounded-md bg-[var(--accent)] px-2.5 py-2 text-[12px] font-medium text-white transition hover:opacity-90"
+        >
+          Run the guided demo →
+        </button>
+        <p className="mt-1.5 text-[10px] leading-relaxed text-[var(--muted)]">
+          Opens Sean&apos;s empty chat, where both required demos are one click each.
+        </p>
       </div>
 
       <div className="scroll-thin flex-1 overflow-y-auto px-3 py-3">
