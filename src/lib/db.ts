@@ -127,10 +127,32 @@ export async function db(): Promise<Client> {
   return rawClient();
 }
 
+function isMissingTable(err: unknown): boolean {
+  return /no such table/i.test(err instanceof Error ? err.message : String(err));
+}
+
+/**
+ * "Schema is ready" is memoized per instance, which is right for the common
+ * case and wrong the moment the database is reset out from under a warm
+ * instance — the documented way to reset a demo. Without this the instance
+ * stays broken until it recycles. On a missing-table error we re-run init
+ * once and retry, so the app self-heals instead of serving 500s.
+ */
+async function withSchemaRetry<T>(fn: (c: Client) => Promise<T>): Promise<T> {
+  try {
+    return await fn(await db());
+  } catch (err) {
+    if (!isMissingTable(err)) throw err;
+    _ready = null;
+    return fn(await db());
+  }
+}
+
 export async function all<T>(sql: string, args: InValue[] = []): Promise<T[]> {
-  const c = await db();
-  const res = await c.execute({ sql, args });
-  return res.rows as unknown as T[];
+  return withSchemaRetry(async (c) => {
+    const res = await c.execute({ sql, args });
+    return res.rows as unknown as T[];
+  });
 }
 
 export async function one<T>(sql: string, args: InValue[] = []): Promise<T | null> {
@@ -139,8 +161,9 @@ export async function one<T>(sql: string, args: InValue[] = []): Promise<T | nul
 }
 
 export async function run(sql: string, args: InValue[] = []): Promise<void> {
-  const c = await db();
-  await c.execute({ sql, args });
+  await withSchemaRetry(async (c) => {
+    await c.execute({ sql, args });
+  });
 }
 
 export function nowIso(): string {
