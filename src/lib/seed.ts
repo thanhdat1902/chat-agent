@@ -590,28 +590,28 @@ export async function seedIfEmpty(c: Client): Promise<void> {
 
   for (const u of USERS) {
     stmts.push({
-      sql: `INSERT INTO users (id, name, role, color) VALUES (?,?,?,?)`,
+      sql: `INSERT OR IGNORE INTO users (id, name, role, color) VALUES (?,?,?,?)`,
       args: [u.id, u.name, u.role, u.color],
     });
   }
   for (const t of TEAMS) {
-    stmts.push({ sql: `INSERT INTO teams (id, name) VALUES (?,?)`, args: [t.id, t.name] });
+    stmts.push({ sql: `INSERT OR IGNORE INTO teams (id, name) VALUES (?,?)`, args: [t.id, t.name] });
   }
   for (const m of MEMBERSHIPS) {
     stmts.push({
-      sql: `INSERT INTO team_members (team_id, user_id) VALUES (?,?)`,
+      sql: `INSERT OR IGNORE INTO team_members (team_id, user_id) VALUES (?,?)`,
       args: [m.team_id, m.user_id],
     });
   }
 
   for (const s of SESSIONS) {
     stmts.push({
-      sql: `INSERT INTO sessions (id, user_id, title, seq, created_at) VALUES (?,?,?,?,?)`,
+      sql: `INSERT OR IGNORE INTO sessions (id, user_id, title, seq, created_at) VALUES (?,?,?,?,?)`,
       args: [s.id, s.user_id, s.title, s.seq, daysAgo(s.createdDaysAgo)],
     });
     s.messages.forEach((msg, i) => {
       stmts.push({
-        sql: `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?,?,?,?,?)`,
+        sql: `INSERT OR IGNORE INTO messages (id, session_id, role, content, created_at) VALUES (?,?,?,?,?)`,
         args: [
           msg.id,
           s.id,
@@ -626,7 +626,7 @@ export async function seedIfEmpty(c: Client): Promise<void> {
   for (const m of MEMORIES) {
     const created = daysAgo(m.daysAgo, 11);
     stmts.push({
-      sql: `INSERT INTO memories
+      sql: `INSERT OR IGNORE INTO memories
               (id, scope, owner_user_id, team_id, org_id, key, content, status, binding,
                confidence, rationale, created_by, source_session_id, source_message_id,
                source_quote, created_at, updated_at, supersedes_id, proposed_scope)
@@ -654,7 +654,7 @@ export async function seedIfEmpty(c: Client): Promise<void> {
       ],
     });
     stmts.push({
-      sql: `INSERT INTO memory_events (id, memory_id, actor_user_id, action, detail, created_at)
+      sql: `INSERT OR IGNORE INTO memory_events (id, memory_id, actor_user_id, action, detail, created_at)
             VALUES (?,?,?,?,?,?)`,
       args: [
         `evt_${m.id}`,
@@ -667,7 +667,7 @@ export async function seedIfEmpty(c: Client): Promise<void> {
     });
     if (m.source_message_id) {
       stmts.push({
-        sql: `INSERT INTO message_memories (message_id, memory_id, relation) VALUES (?,?,?)`,
+        sql: `INSERT OR IGNORE INTO message_memories (message_id, memory_id, relation) VALUES (?,?,?)`,
         args: [m.source_message_id, m.id, "created"],
       });
     }
@@ -682,7 +682,7 @@ export async function seedIfEmpty(c: Client): Promise<void> {
   ];
   for (const [messageId, memoryId] of influenced) {
     stmts.push({
-      sql: `INSERT INTO message_memories (message_id, memory_id, relation) VALUES (?,?,?)`,
+      sql: `INSERT OR IGNORE INTO message_memories (message_id, memory_id, relation) VALUES (?,?,?)`,
       args: [messageId, memoryId, "used"],
     });
   }
