@@ -154,5 +154,57 @@ check(
   (await listVisibleMemories(daniel)).some((m) => m.id === "mem_pending_cc"),
 );
 
+console.log("\n== delete a chat ==");
+const { deleteSession } = await import("../src/lib/sessions");
+const { all } = await import("../src/lib/db");
+
+await throws("you cannot delete someone else's chat", 403, () =>
+  deleteSession(mitchell, "s_ryan_1"),
+);
+await throws("or one that does not exist", 404, () => deleteSession(ryan, "s_nope"));
+
+// Ryan's session #1 is where the Finance pricing rule was stated.
+const ruleBefore = await getMemoryAs(ryan, "mem_fin_pricing");
+check("the rule exists before the chat is deleted", true, Boolean(ruleBefore));
+await deleteSession(ryan, "s_ryan_1");
+check(
+  "session gone",
+  0,
+  (await all<{ n: number }>(`SELECT COUNT(*) AS n FROM sessions WHERE id = ?`, ["s_ryan_1"]))[0]
+    .n,
+);
+check(
+  "its messages gone",
+  0,
+  (await all<{ n: number }>(`SELECT COUNT(*) AS n FROM messages WHERE session_id = ?`, [
+    "s_ryan_1",
+  ]))[0].n,
+);
+check(
+  "no orphaned message links left behind",
+  0,
+  (
+    await all<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM message_memories mm
+        WHERE NOT EXISTS (SELECT 1 FROM messages m WHERE m.id = mm.message_id)`,
+    )
+  )[0].n,
+);
+// The knowledge outlives the transcript — a team rule others rely on must not
+// vanish because its author tidied up their own chat history.
+check(
+  "the team rule survives, and still reaches Sean",
+  true,
+  Boolean(await getMemoryAs(sean, "mem_fin_pricing")),
+);
+check(
+  "and still reaches a prompt",
+  true,
+  (await retrieveForTurn(sean, "price the renewal")).injected.some(
+    (m) => m.id === "mem_fin_pricing",
+  ),
+);
+check("and is still invisible to Mitchell", null, await getMemoryAs(mitchell, "mem_fin_pricing"));
+
 console.log(`\npassed=${pass} failed=${fail}`);
 process.exit(fail === 0 ? 0 : 1);

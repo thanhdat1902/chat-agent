@@ -5,6 +5,7 @@ import type { AppState } from "@/lib/state";
 import Sidebar from "./Sidebar";
 import Conversation from "./Conversation";
 import MemoryPanel from "./MemoryPanel";
+import ConfirmDialog, { type ConfirmRequest } from "./ConfirmDialog";
 
 export interface ChatMeta {
   injected: string[];
@@ -18,6 +19,8 @@ export default function App({ initial }: { initial: AppState }) {
   const [busy, setBusy] = useState(false);
   const [lastMeta, setLastMeta] = useState<ChatMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const refresh = useCallback(
     async (userId: string, sessionId: string | null) => {
@@ -89,6 +92,55 @@ export default function App({ initial }: { initial: AppState }) {
     [],
   );
 
+  /**
+   * Opens the confirmation dialog and owns the busy/close/error handling, so
+   * every destructive action in the app funnels through one path.
+   */
+  const requestConfirm = useCallback(
+    (opts: Omit<ConfirmRequest, "onConfirm"> & { run: () => Promise<Response> }) => {
+      setConfirm({
+        ...opts,
+        onConfirm: async () => {
+          setConfirmBusy(true);
+          setError(null);
+          try {
+            const res = await opts.run();
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error ?? "Request failed");
+            setState(data as AppState);
+            setLastMeta(null);
+          } catch (e) {
+            setError((e as Error).message);
+          } finally {
+            setConfirmBusy(false);
+            setConfirm(null);
+          }
+        },
+      });
+    },
+    [],
+  );
+
+  const requestDeleteSession = useCallback(
+    (sessionId: string, title: string) => {
+      requestConfirm({
+        title: "Delete this chat?",
+        body: `“${title}” and every message in it will be removed.`,
+        note: "Rules the agent learned from this conversation are kept — they may be in use by your team. Remove those separately in the memory panel.",
+        confirmLabel: "Delete chat",
+        run: () =>
+          fetch(
+            `/api/sessions/${sessionId}?${new URLSearchParams({
+              userId: state.actor.id,
+              sessionId,
+            })}`,
+            { method: "DELETE" },
+          ),
+      });
+    },
+    [state.actor.id, requestConfirm],
+  );
+
   const activeSession = useMemo(
     () =>
       Object.values(state.sessionsByUser)
@@ -104,6 +156,7 @@ export default function App({ initial }: { initial: AppState }) {
         onSelectSession={selectSession}
         onSwitchUser={(u) => void refresh(u, null)}
         onNewSession={newSession}
+        onDeleteSession={requestDeleteSession}
       />
 
       <main className="flex min-w-0 flex-1 flex-col">
@@ -128,7 +181,18 @@ export default function App({ initial }: { initial: AppState }) {
         />
       </main>
 
-      <MemoryPanel state={state} lastMeta={lastMeta} onMutate={mutate} />
+      <MemoryPanel
+        state={state}
+        lastMeta={lastMeta}
+        onMutate={mutate}
+        onRequestConfirm={requestConfirm}
+      />
+
+      <ConfirmDialog
+        request={confirm}
+        busy={confirmBusy}
+        onCancel={() => setConfirm(null)}
+      />
     </div>
   );
 }

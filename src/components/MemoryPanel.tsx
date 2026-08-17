@@ -5,6 +5,11 @@ import type { AppState, MemoryView } from "@/lib/state";
 import type { Scope } from "@/lib/types";
 import { ScopeTag } from "./Conversation";
 import type { ChatMeta } from "./App";
+import type { ConfirmRequest } from "./ConfirmDialog";
+
+export type RequestConfirm = (
+  opts: Omit<ConfirmRequest, "onConfirm"> & { run: () => Promise<Response> },
+) => void;
 
 type Tab = "memory" | "precedence" | "leak";
 
@@ -22,10 +27,12 @@ export default function MemoryPanel({
   state,
   lastMeta,
   onMutate,
+  onRequestConfirm,
 }: {
   state: AppState;
   lastMeta: ChatMeta | null;
   onMutate: (input: RequestInfo, init?: RequestInit) => Promise<void>;
+  onRequestConfirm: RequestConfirm;
 }) {
   const [tab, setTab] = useState<Tab>("memory");
 
@@ -55,7 +62,12 @@ export default function MemoryPanel({
 
       <div className="scroll-thin flex-1 overflow-y-auto p-4">
         {tab === "memory" && (
-          <MemoryList state={state} lastMeta={lastMeta} onMutate={onMutate} />
+          <MemoryList
+            state={state}
+            lastMeta={lastMeta}
+            onMutate={onMutate}
+            onRequestConfirm={onRequestConfirm}
+          />
         )}
         {tab === "precedence" && <Precedence state={state} />}
         {tab === "leak" && <LeakTest state={state} />}
@@ -68,10 +80,12 @@ function MemoryList({
   state,
   lastMeta,
   onMutate,
+  onRequestConfirm,
 }: {
   state: AppState;
   lastMeta: ChatMeta | null;
   onMutate: (input: RequestInfo, init?: RequestInit) => Promise<void>;
+  onRequestConfirm: RequestConfirm;
 }) {
   const groups: [string, MemoryView[]][] = [
     ["Personal", state.memories.filter((m) => m.scope === "personal")],
@@ -105,6 +119,7 @@ function MemoryList({
                   state={state}
                   used={lastMeta?.injected.includes(m.id) ?? false}
                   onMutate={onMutate}
+                  onRequestConfirm={onRequestConfirm}
                 />
               ))}
             </ul>
@@ -120,11 +135,13 @@ function MemoryCard({
   state,
   used,
   onMutate,
+  onRequestConfirm,
 }: {
   memory: MemoryView;
   state: AppState;
   used: boolean;
   onMutate: (input: RequestInfo, init?: RequestInit) => Promise<void>;
+  onRequestConfirm: RequestConfirm;
 }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(memory.content);
@@ -283,12 +300,25 @@ function MemoryCard({
         )}
         <button
           onClick={() =>
-            onMutate(
-              `/api/memories/${memory.id}?userId=${state.actor.id}&sessionId=${
-                state.activeSessionId ?? ""
-              }`,
-              { method: "DELETE" },
-            )
+            onRequestConfirm({
+              title: "Delete this memory?",
+              body: `The agent will stop following “${memory.content}”.`,
+              note:
+                memory.scope === "personal"
+                  ? "This rule only affects you."
+                  : `This rule is in force for ${
+                      memory.scope === "org" ? "everyone" : `the ${memory.teamName} team`
+                    }. Deleting it removes it for them too.`,
+              confirmLabel: "Delete memory",
+              run: () =>
+                fetch(
+                  `/api/memories/${memory.id}?${new URLSearchParams({
+                    userId: state.actor.id,
+                    sessionId: state.activeSessionId ?? "",
+                  })}`,
+                  { method: "DELETE" },
+                ),
+            })
           }
           className="text-[11px] font-medium text-[#c0392b]"
         >

@@ -7,11 +7,13 @@ export default function Sidebar({
   onSelectSession,
   onSwitchUser,
   onNewSession,
+  onDeleteSession,
 }: {
   state: AppState;
   onSelectSession: (userId: string, sessionId: string) => void;
   onSwitchUser: (userId: string) => void;
   onNewSession: () => void;
+  onDeleteSession: (sessionId: string, title: string) => void;
 }) {
   return (
     <aside className="flex w-[300px] shrink-0 flex-col border-r border-[var(--line)] bg-white">
@@ -77,10 +79,10 @@ export default function Sidebar({
                 {(state.sessionsByUser[u.id] ?? []).map((s) => {
                   const active = s.id === state.activeSessionId;
                   return (
-                    <li key={s.id}>
+                    <li key={s.id} className="group relative">
                       <button
                         onClick={() => onSelectSession(u.id, s.id)}
-                        className={`w-full truncate rounded-md border px-2.5 py-2 text-left text-[13px] transition ${
+                        className={`w-full truncate rounded-md border py-2 pl-2.5 pr-8 text-left text-[13px] transition ${
                           active
                             ? "border-[var(--accent)] bg-[#eef3fe] font-medium text-[var(--accent)]"
                             : "border-[var(--line)] bg-white hover:bg-[#f6f7f9]"
@@ -89,6 +91,31 @@ export default function Sidebar({
                       >
                         {s.title}
                       </button>
+                      {isActor && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteSession(s.id, s.title);
+                          }}
+                          aria-label={`Delete ${s.title}`}
+                          title="Delete chat"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--muted)] opacity-0 transition focus:opacity-100 focus-visible:ring-2 focus-visible:ring-[var(--accent)] group-hover:opacity-100 hover:bg-[#fdecea] hover:text-[#c0392b]"
+                        >
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V6M10 11v6M14 11v6" />
+                          </svg>
+                        </button>
+                      )}
                     </li>
                   );
                 })}
