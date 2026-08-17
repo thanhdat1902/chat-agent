@@ -54,14 +54,20 @@ right rail for everyone.
 | Right rail → **Precedence** | The ladder plus live conflicts for this user |
 | Right rail → **Leak test** | Pick a memory *you* can see, ask whether someone else can |
 
-**The account book.** Every user also sees a small shared reference table — three accounts with
-seats, prior-term value, a Q3 pricing sheet figure, a public rate card figure, renewal date and
-notes. It is **reference data, not memory**: identical for everyone, present in both seed modes,
-and never scoped. That is deliberate — because the data is constant, any difference between two
-users' answers is attributable to the memories they hold and nothing else. It also gives rules
-something concrete to act on: a rule naming the Q3 sheet only demonstrates something if both
-figures are available. The book explicitly states that *which* pricing source applies is team
-policy and cannot be inferred from the table.
+**Reference documents.** Alongside memories, the agent can cite documents — and those are scoped
+by the **same** SQL predicate. Right rail → **Shared data**:
+
+| Document | Scope | Who sees it |
+|---|---|---|
+| Account book — customers, seats, prior term, **public rate card**, renewal dates | `org` | everyone |
+| **Q3 renewal pricing sheet** — the internal renewal figures | `team · Finance` | Ryan, Sean |
+| Implementation runbook — rollout sequence, on-call rota | `team · Operations` | Daniel, Mitchell |
+
+The org-wide account book is the **control**: identical for all four users, so a difference in two
+answers cannot be blamed on them looking at different customers. The Q3 sheet is the **variable**:
+Operations does not merely lack the rule about which sheet to quote — the sheet itself never comes
+back from their query. Documents are not rules, but "which pricing sheet exists" is as much a
+permission question as "which pricing rule applies", so both run through `scopePredicate()`.
 
 **One expectation to set:** the agent's wording changes run to run. What is stable — and what you
 should actually check — is the **scope**, the **status**, which memories were **injected**, and
@@ -233,15 +239,28 @@ As **Mitchell** (Operations), **the identical message**:
 How should I price the Northwind renewal?
 ```
 
-**Expected: he refuses to pick a price.** Something like:
+**Expected: a different number.** Something like:
 
-> For **Northwind** I wouldn't pick a price yet — I don't know which pricing source applies and
-> that needs confirming. Known figures: seats **240**, prior term **$84,000**, Q3 pricing sheet
-> **$87,400**, public rate card **$91,200**.
+> Price Northwind at the public rate card: **$91,200** for 240 seats. Up from prior term
+> **$84,000** — an increase of **$7,200**, about **8.6%**.
 
-**This is the sharpest moment in the whole guide.** Mitchell can see the exact same figures Sean
-saw — the account book is identical for both. What he does not have is the rule that says which
-column to quote. Same data, same question, same code; only the memories differ.
+**This is the sharpest moment in the whole guide.** Two colleagues quote the same customer
+**$87,400** and **$91,200** — a $3,800 discrepancy — and neither is behaving badly. Mitchell is
+quoting the only pricing he can see. He is missing *both* halves: the Finance rule that says which
+sheet governs renewals, and the Finance sheet that contains the number.
+
+Prove the document half directly: right rail → **Shared data**. Mitchell has the account book and
+the Operations runbook. There is no Q3 sheet, and the string `$87,400` appears nowhere in anything
+he can read. Switch to Sean and it is there.
+
+> Both requests run the same code. The difference is one SQL predicate, applied to two tables:
+> ```sql
+> scope='org'
+> OR (scope='team' AND team_id IN (:actorTeams))   -- Sean: [Finance] · Mitchell: [Operations]
+> OR (scope='personal' AND owner_user_id = :actor)
+> ```
+> Neither the Finance rule nor the Finance sheet is filtered out of Mitchell's *answer* — neither
+> is returned by his queries, so neither was ever in the context window.
 
 > Both requests run the same code. The only difference is one SQL predicate:
 > ```sql
@@ -527,8 +546,8 @@ delete a chat               9 — ownership, orphan cleanup, knowledge survival
 | 2.3 | "Tell Acme it'll be live September 30" | Sean | gives the date — pending binds nobody |
 | 2.4 | same, after ratifying as binding | Sean | **refuses** the date |
 | 3.1 | "For our team specifically: quote off the Q3 sheet…" | Ryan | `team · Finance` |
-| 3.2 | "How should I price the Northwind renewal?" | Sean | uses the Q3 sheet |
-| 3.3 | identical message | Mitchell | generic advice, no Q3 sheet |
+| 3.2 | "How should I price the Northwind renewal?" | Sean | quotes **$87,400** off the Q3 sheet, with the delta |
+| 3.3 | identical message | Mitchell | quotes **$91,200** (rate card) — no Q3 sheet, no Finance rule |
 | 3.5 | probe the Finance rule | Mitchell | **404** |
 | 3.5 | probe the org rule | Mitchell | **200** |
 | 4.3 | "Where does the Acme rollout stand?" | Daniel | bullets — personal beats org default |
