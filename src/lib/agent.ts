@@ -63,7 +63,9 @@ ACCOUNT BOOK (internal reference, current figures)
 |---|---|---|---|---|---|---|
 ${rows}
 
-Use these figures when they are relevant, and cite the account by name. Do not invent numbers that are not in this table. If a standing rule tells you which pricing source to use, use that column.`;
+Cite the account by name and use these figures rather than inventing any.
+
+The book deliberately lists more than one pricing source. Which one applies is a matter of team policy, and is NOT something you can infer from this table or from the column names — recency, label, and which number is lower are all irrelevant. If a standing rule below tells you which source to quote, follow it. If no rule does, say plainly that you do not know which pricing source applies here and that it needs confirming, rather than picking one yourself.`;
 }
 
 export function buildSystemPrompt(
