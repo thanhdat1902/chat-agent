@@ -1,6 +1,6 @@
 import { activeProvider, completeText } from "./llm";
 import { precedence } from "./memory";
-import { listVisibleDocuments } from "./permissions";
+import { retrieveDocuments, type DocRetrieval } from "./documents";
 import type { Actor, Doc, Memory, Message, RetrievalResult } from "./types";
 
 function scopeLabel(m: Memory, teamName: string): string {
@@ -24,34 +24,49 @@ const scopeTag = (d: Doc, teamName: string) =>
   d.scope === "org" ? "ORG" : d.scope === "team" ? `TEAM · ${teamName}` : "PERSONAL";
 
 /**
- * Reference material the answer may cite. These arrive already filtered by the
- * same scope predicate that filters memories — so a Finance pricing sheet is
- * simply absent from an Operations prompt, exactly as a Finance rule is.
+ * Documents reach the prompt in two layers.
  *
- * The prompt says plainly that the set is scoped and may be incomplete, so the
- * agent says "I don't have that" rather than inventing the missing figures.
+ * The INDEX lists everything the actor may read — one line each. It is cheap,
+ * and it means the agent knows what exists rather than silently guessing.
+ *
+ * Only documents relevant to this turn have their CONTENTS included. Sending
+ * every body every turn is what made the agent reach for internal figures on
+ * questions that did not call for them. Relevance is scored against the turn
+ * *and against the rules that were injected*, so a rule naming a document
+ * pulls that document in — the rule is what makes the data apply.
  */
-function documentBlock(docs: Doc[], teamName: string): string {
-  if (docs.length === 0) return "";
-  const sections = docs
-    .map((d) => `### ${d.title}  [${scopeTag(d, teamName)}]\n${d.summary}\n\n${d.body}`)
+function documentBlock(r: DocRetrieval, teamName: string): string {
+  if (r.index.length === 0) return "";
+
+  const listed = r.index
+    .map((d) => `- ${d.title} [${scopeTag(d, teamName)}] — ${d.summary}`)
+    .join("\n");
+
+  const bodies = r.injected
+    .map((d) => `### ${d.title}  [${scopeTag(d, teamName)}]\n${d.body}`)
     .join("\n\n");
+
   return `
 
-REFERENCE DOCUMENTS
-These are the documents you have access to. Cite figures from them rather than inventing any.
-This set is scoped to you and may not be everything that exists in the company — if answering
-needs a document you do not have here, say what is missing and that it needs to come from
-whoever owns it. Do not guess at its contents.
+DOCUMENTS YOU CAN READ
+${listed}
 
-${sections}`;
+This index is scoped to you and may not be everything that exists in the company. If answering
+well needs a document that is not listed, say what is missing and who would own it. Never guess
+at the contents of a document.
+
+${
+  r.injected.length > 0
+    ? `CONTENTS RELEVANT TO THIS TURN\nCite figures from these rather than inventing any.\n\n${bodies}`
+    : `No document contents were pulled in for this turn. Answer from the conversation and your standing rules. If a figure is needed, say which document would have it rather than estimating.`
+}`;
 }
 
 export function buildSystemPrompt(
   actor: Actor,
   retrieval: RetrievalResult,
   authors: Map<string, string>,
-  docs: Doc[] = [],
+  docs: DocRetrieval = { index: [], injected: [] },
 ): string {
   const teamName = actor.teamNames[0] ?? "no team";
   const header = `You are the workplace assistant for ${actor.user.name} (${actor.user.role}), on the ${teamName} team.
@@ -92,7 +107,10 @@ export async function generateReply(
   retrieval: RetrievalResult,
   authors: Map<string, string>,
 ): Promise<string> {
-  const system = buildSystemPrompt(actor, retrieval, authors, await listVisibleDocuments(actor));
+  const lastUserTurn = [...history].reverse().find((m) => m.role === "user")?.content ?? "";
+  const ruleText = retrieval.injected.map((m) => `${m.content} ${m.key}`).join(" ");
+  const docs = await retrieveDocuments(actor, lastUserTurn, ruleText);
+  const system = buildSystemPrompt(actor, retrieval, authors, docs);
 
   if (activeProvider() === "none") return offlineReply(retrieval, authors);
 

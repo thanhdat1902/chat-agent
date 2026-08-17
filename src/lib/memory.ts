@@ -54,7 +54,7 @@ const STOPWORDS = new Set(
   ),
 );
 
-function tokens(text: string): Set<string> {
+export function tokens(text: string): Set<string> {
   return new Set(
     text
       .toLowerCase()
@@ -64,7 +64,7 @@ function tokens(text: string): Set<string> {
   );
 }
 
-function overlap(a: Set<string>, b: Set<string>): number {
+export function overlap(a: Set<string>, b: Set<string>): number {
   if (!a.size || !b.size) return 0;
   let hits = 0;
   for (const t of a) if (b.has(t)) hits += 1;
