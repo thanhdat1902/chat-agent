@@ -17,9 +17,14 @@ for (const s of ["", "-wal", "-shm"]) {
   }
 }
 
-const { loadActor, getMemoryAs, listVisibleMemories, HttpError } = await import(
-  "../src/lib/permissions"
-);
+const {
+  loadActor,
+  getMemoryAs,
+  listVisibleMemories,
+  listVisibleDocuments,
+  getDocumentAs,
+  HttpError,
+} = await import("../src/lib/permissions");
 const {
   retrieveForTurn,
   correctMemory,
@@ -158,6 +163,21 @@ check(
   "and gone from everyone",
   false,
   (await listVisibleMemories(daniel)).some((m) => m.id === "mem_pending_cc"),
+);
+
+console.log("\n== documents obey the same boundary as memories ==");
+check("everyone sees the org account book", true, Boolean(await getDocumentAs(mitchell, "doc_account_book")));
+check("finance sees the Q3 sheet", true, Boolean(await getDocumentAs(sean, "doc_q3_pricing")));
+check("operations does not", null, await getDocumentAs(mitchell, "doc_q3_pricing"));
+check("and neither does the other ops member", null, await getDocumentAs(daniel, "doc_q3_pricing"));
+check("operations sees its own runbook", true, Boolean(await getDocumentAs(daniel, "doc_ops_runbook")));
+check("finance does not", null, await getDocumentAs(ryan, "doc_ops_runbook"));
+check("sean's visible set is org + finance", 2, (await listVisibleDocuments(sean)).length);
+check("mitchell's is org + operations", 2, (await listVisibleDocuments(mitchell)).length);
+check(
+  "the Q3 figure is absent from mitchell's documents entirely",
+  false,
+  (await listVisibleDocuments(mitchell)).some((d) => d.body.includes("87,400")),
 );
 
 console.log("\n== supersession cannot be used to escalate ==");

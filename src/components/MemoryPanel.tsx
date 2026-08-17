@@ -323,78 +323,74 @@ function MemoryCard({
 }
 
 
-const money = (n: number) => `$${n.toLocaleString("en-US")}`;
-
 /**
- * The account book, shown so it is obvious the agent is citing something real
- * — and equally obvious that it is NOT memory. Every user sees this identical
- * table, which is what makes a difference between two users' answers
- * attributable to the memories they hold.
+ * Documents are reference material, not rules — but they run through the same
+ * scope predicate, so this panel is the visible proof that the boundary covers
+ * what an answer can cite, not just what it must obey.
  */
 function Reference({ state }: { state: AppState }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const org = state.documents.filter((d) => d.scope === "org");
+  const scoped = state.documents.filter((d) => d.scope !== "org");
+
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-[var(--line)] bg-[#f8fafc] px-3 py-2.5">
-        <div className="flex items-center gap-1.5">
-          <span className="rounded border border-[#ccd4f5] bg-[#eef1fd] px-1.5 py-[1px] text-[10px] font-semibold uppercase tracking-wide text-[#3b4bb3]">
-            Organization-wide
-          </span>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
-            not memory
-          </span>
-        </div>
-        <p className="mt-2 text-[11px] leading-relaxed text-[var(--muted)]">
-          The company account book. Every user sees this same table, unfiltered — it is reference
-          data, not a rule, so it is never scoped and never appears in the memory panel. Holding
-          it constant is deliberate: when two people ask the same question and get different
-          answers, the data was identical, so the difference came from memory.
-        </p>
-        <p className="mt-2 text-[11px] leading-relaxed text-[var(--muted)]">
-          It carries <em>both</em> pricing sources on purpose. Which one to quote is team policy —
-          the table says so explicitly — so an agent with no rule about it declines to choose.
-        </p>
-      </div>
-
-      {state.accounts.length === 0 ? (
-        <p className="rounded-md border border-dashed border-[var(--line)] px-3 py-3 text-[12px] text-[var(--muted)]">
-          No accounts loaded.
-        </p>
-      ) : (
-        <ul className="space-y-2">
-          {state.accounts.map((a) => (
-            <li key={a.name} className="rounded-lg border border-[var(--line)] px-3 py-2.5">
-              <div className="flex items-baseline justify-between">
-                <span className="text-[13px] font-semibold">{a.name}</span>
-                <span className="text-[11px] text-[var(--muted)]">{a.seats} seats</span>
-              </div>
-              <dl className="mt-1.5 space-y-0.5 text-[12px]">
-                <div className="flex justify-between">
-                  <dt className="text-[var(--muted)]">Prior term</dt>
-                  <dd className="font-mono">{money(a.prior_term_usd)}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-[var(--muted)]">Q3 pricing sheet</dt>
-                  <dd className="font-mono">{money(a.q3_sheet_usd)}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-[var(--muted)]">Public rate card</dt>
-                  <dd className="font-mono">{money(a.rate_card_usd)}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-[var(--muted)]">Renews</dt>
-                  <dd className="font-mono">{a.renews_on}</dd>
-                </div>
-              </dl>
-              <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--muted)]">{a.notes}</p>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <p className="rounded-md border border-[var(--line)] px-3 py-2 text-[11px] leading-relaxed text-[var(--muted)]">
-        Seeded in <span className="font-mono">src/lib/seed.ts</span> and injected into every
-        system prompt. Edit it there and run <span className="font-mono">npm run reset</span>.
+      <p className="rounded-md border border-[var(--line)] bg-[#f8fafc] px-3 py-2 text-[11px] leading-relaxed text-[var(--muted)]">
+        What {state.actor.name}&apos;s agent can cite. Documents are not rules, but they are
+        scoped by the <em>same</em> SQL predicate as memories — so a Finance sheet is absent from
+        an Operations prompt exactly as a Finance rule is. Org-wide documents are the constant:
+        everyone sees those, which is what makes a difference in two answers attributable to
+        scope rather than to different customer data.
       </p>
+
+      {[
+        ["Organization-wide — everyone sees these", org],
+        [`Scoped to ${state.actor.teamNames[0] ?? "no team"}`, scoped],
+      ].map(([label, docs]) => (
+        <section key={label as string}>
+          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+            {label as string} · {(docs as typeof state.documents).length}
+          </h3>
+          {(docs as typeof state.documents).length === 0 ? (
+            <p className="rounded-md border border-dashed border-[var(--line)] px-3 py-3 text-[12px] text-[var(--muted)]">
+              Nothing at this scope for {state.actor.name}.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {(docs as typeof state.documents).map((d) => (
+                <li key={d.id} className="rounded-lg border border-[var(--line)] px-3 py-2.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span
+                      className={`rounded border px-1.5 py-[1px] text-[10px] font-semibold uppercase tracking-wide ${
+                        d.scope === "org"
+                          ? "border-[#f0d6b4] bg-[#fdf1e3] text-[#9a5b13]"
+                          : "border-[#c6e2d0] bg-[#e9f3ec] text-[#1c6b39]"
+                      }`}
+                    >
+                      {d.scope === "org" ? "Org" : `Team · ${state.actor.teamNames[0]}`}
+                    </span>
+                    <span className="text-[13px] font-semibold">{d.title}</span>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-[var(--muted)]">
+                    {d.summary}
+                  </p>
+                  <button
+                    onClick={() => setOpen(open === d.id ? null : d.id)}
+                    className="mt-1.5 text-[11px] text-[var(--muted)] underline decoration-dotted underline-offset-2 hover:text-[var(--accent)]"
+                  >
+                    {open === d.id ? "Hide" : "Show"} contents
+                  </button>
+                  {open === d.id && (
+                    <pre className="scroll-thin mt-2 overflow-x-auto whitespace-pre rounded border border-[var(--line)] bg-[#fbfcfd] p-2 font-mono text-[10.5px] leading-relaxed">
+                      {d.body}
+                    </pre>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ))}
     </div>
   );
 }

@@ -105,16 +105,25 @@ export const SCHEMA = [
      relation TEXT NOT NULL,
      PRIMARY KEY (message_id, memory_id, relation)
    )`,
-  `CREATE TABLE IF NOT EXISTS accounts (
+  `CREATE TABLE IF NOT EXISTS documents (
      id TEXT PRIMARY KEY,
-     name TEXT NOT NULL,
-     seats INTEGER NOT NULL,
-     prior_term_usd INTEGER NOT NULL,
-     q3_sheet_usd INTEGER NOT NULL,
-     rate_card_usd INTEGER NOT NULL,
-     renews_on TEXT NOT NULL,
-     notes TEXT NOT NULL
+     scope TEXT NOT NULL CHECK (scope IN ('personal','team','org')),
+     owner_user_id TEXT,
+     team_id TEXT,
+     org_id TEXT,
+     title TEXT NOT NULL,
+     summary TEXT NOT NULL,
+     body TEXT NOT NULL,
+     created_by TEXT NOT NULL,
+     created_at TEXT NOT NULL,
+     -- Same scope invariant as memories, enforced by the database.
+     CHECK (
+       (scope = 'personal' AND owner_user_id IS NOT NULL AND team_id IS NULL)
+       OR (scope = 'team' AND team_id IS NOT NULL AND owner_user_id IS NULL)
+       OR (scope = 'org'  AND team_id IS NULL AND owner_user_id IS NULL AND org_id IS NOT NULL)
+     )
    )`,
+  `CREATE INDEX IF NOT EXISTS idx_documents_scope ON documents(scope, team_id)`,
   `CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_memories_scope ON memories(scope, status)`,
   `CREATE INDEX IF NOT EXISTS idx_memories_team ON memories(team_id)`,

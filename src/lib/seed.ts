@@ -22,61 +22,89 @@ import { ORG_ID } from "./permissions";
 
 
 /**
- * A small account book — shared reference data, not memory.
+ * Reference documents, scoped exactly like memories.
  *
- * It exists so the memory rules have something concrete to act on: the Finance
- * rule says "quote off the Q3 sheet, not the public rate card", and both
- * figures are here, so following the rule produces a visibly different number.
- * Every user sees the same book, so any difference between two users' answers
- * is attributable to memory and nothing else.
+ * The account book is org-wide: everyone sees the same customers, seats,
+ * prior-term values and the public rate card. That constant is the control —
+ * it means a difference between two users' answers cannot be blamed on them
+ * looking at different customer data.
+ *
+ * The Q3 renewal pricing sheet is Finance-only. So Operations does not merely
+ * lack the *rule* about which sheet to quote; the sheet itself is not in their
+ * query result. Both halves of the boundary — the policy and the material —
+ * run through the same predicate.
  */
-export const ACCOUNTS = [
+export const DOCUMENTS = [
   {
-    id: "acct_northwind",
-    name: "Northwind",
-    seats: 240,
-    prior_term_usd: 84_000,
-    q3_sheet_usd: 87_400,
-    rate_card_usd: 91_200,
-    renews_on: "2026-09-30",
-    notes: "SSO integration requested; sitting in the engineering backlog with no committed date.",
+    id: "doc_account_book",
+    scope: "org" as const,
+    team: null,
+    title: "Account book",
+    summary: "Customers, seats, prior-term value, public list pricing and renewal dates.",
+    body: [
+      "| Account | Seats | Prior term | Public rate card | Renews | Notes |",
+      "|---|---|---|---|---|---|",
+      "| Northwind | 240 | $84,000 | $91,200 | 2026-09-30 | SSO integration requested; in the engineering backlog with no committed date. |",
+      "| Acme | 150 | $52,000 | $58,000 | 2026-10-12 | Asking when SSO ships. Engineering has not signed off on a date. |",
+      "| Contoso | 600 | $128,000 | $142,500 | 2027-01-31 | Expanding into two more regions next term; wants volume pricing. |",
+    ].join("\n"),
+    created_by: "u_ryan",
+    daysAgo: 45,
   },
   {
-    id: "acct_acme",
-    name: "Acme",
-    seats: 150,
-    prior_term_usd: 52_000,
-    q3_sheet_usd: 54_600,
-    rate_card_usd: 58_000,
-    renews_on: "2026-10-12",
-    notes: "Asking when SSO ships. Engineering has not signed off on a date.",
+    id: "doc_q3_pricing",
+    scope: "team" as const,
+    team: "t_finance",
+    title: "Q3 renewal pricing sheet",
+    summary: "Internal renewal pricing for the current quarter. Finance only.",
+    body: [
+      "Renewal pricing for Q3. These figures supersede the public rate card for renewals.",
+      "",
+      "| Account | Q3 renewal price | vs prior term |",
+      "|---|---|---|",
+      "| Northwind | $87,400 | +$3,400 |",
+      "| Acme | $54,600 | +$2,600 |",
+      "| Contoso | $131,000 | +$3,000 |",
+    ].join("\n"),
+    created_by: "u_ryan",
+    daysAgo: 30,
   },
   {
-    id: "acct_contoso",
-    name: "Contoso",
-    seats: 600,
-    prior_term_usd: 128_000,
-    q3_sheet_usd: 131_000,
-    rate_card_usd: 142_500,
-    renews_on: "2027-01-31",
-    notes: "Expanding into two more regions next term; wants volume pricing.",
+    id: "doc_ops_runbook",
+    scope: "team" as const,
+    team: "t_ops",
+    title: "Implementation runbook",
+    summary: "Rollout sequence and the on-call escalation rota. Operations only.",
+    body: [
+      "Mid-market rollout sequence:",
+      "1. Kickoff call and environment questionnaire",
+      "2. SSO configuration",
+      "3. Data import dry run, then pilot group",
+      "4. Full cutover, then a 30-day check-in",
+      "",
+      "Overnight failures page the on-call rotation, never an engineering manager directly.",
+    ].join("\n"),
+    created_by: "u_daniel",
+    daysAgo: 20,
   },
 ];
 
-function accountStatements() {
-  return ACCOUNTS.map((a) => ({
-    sql: `INSERT OR IGNORE INTO accounts
-            (id, name, seats, prior_term_usd, q3_sheet_usd, rate_card_usd, renews_on, notes)
-          VALUES (?,?,?,?,?,?,?,?)`,
+function documentStatements() {
+  return DOCUMENTS.map((d) => ({
+    sql: `INSERT OR IGNORE INTO documents
+            (id, scope, owner_user_id, team_id, org_id, title, summary, body, created_by, created_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?)`,
     args: [
-      a.id,
-      a.name,
-      a.seats,
-      a.prior_term_usd,
-      a.q3_sheet_usd,
-      a.rate_card_usd,
-      a.renews_on,
-      a.notes,
+      d.id,
+      d.scope,
+      null,
+      d.team,
+      d.scope === "org" ? ORG_ID : null,
+      d.title,
+      d.summary,
+      d.body,
+      d.created_by,
+      daysAgo(d.daysAgo),
     ] as (string | number | null)[],
   }));
 }
@@ -748,7 +776,7 @@ export async function seedIfEmpty(c: Client): Promise<void> {
     });
   }
 
-  stmts.push(...accountStatements());
+  stmts.push(...documentStatements());
   await c.batch(stmts, "write");
 }
 
@@ -787,8 +815,8 @@ export async function seedBlank(c: Client): Promise<void> {
       args: [`s_${u.id.replace("u_", "")}_1`, u.id, "Chat session #1 — New chat", 1, daysAgo(0)],
     });
   }
-  // The account book is the world, not memory — present in both modes.
-  stmts.push(...accountStatements());
+  // Documents are the world, not memory — present in both modes, scoped either way.
+  stmts.push(...documentStatements());
 
   await c.batch(stmts, "write");
 }

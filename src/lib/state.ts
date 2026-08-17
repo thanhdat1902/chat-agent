@@ -1,8 +1,8 @@
 import { all } from "./db";
-import { listVisibleMemories } from "./permissions";
+import { listVisibleDocuments, listVisibleMemories } from "./permissions";
 import { PRECEDENCE_LADDER, precedence } from "./memory";
 import { activeProvider, modelLabel } from "./llm";
-import type { Account, Actor, ChatSession, Memory, MemoryEvent, Message, User } from "./types";
+import type { Actor, ChatSession, Doc, Memory, MemoryEvent, Message, User } from "./types";
 
 export interface UserWithTeams extends User {
   teamIds: string[];
@@ -36,8 +36,8 @@ export interface AppState {
    * demonstrate yet.
    */
   demoEntry: { userId: string; sessionId: string; userName: string } | null;
-  /** Shared reference data every user sees — see the Account type. */
-  accounts: Account[];
+  /** Reference documents this user is entitled to — same predicate as memories. */
+  documents: Doc[];
 }
 
 /**
@@ -150,13 +150,10 @@ export async function loadState(
       ? sessionId
       : (sessionsByUser[actor.id]?.[0]?.id ?? null);
 
-  const [messages, memories, accounts] = await Promise.all([
+  const [messages, memories, documents] = await Promise.all([
     active ? loadMessages(active) : Promise.resolve([]),
     buildMemoryViews(toActor(actor), users),
-    all<Account>(
-      `SELECT name, seats, prior_term_usd, q3_sheet_usd, rate_card_usd, renews_on, notes
-         FROM accounts ORDER BY name`,
-    ),
+    listVisibleDocuments(toActor(actor)),
   ]);
 
   return {
@@ -170,7 +167,7 @@ export async function loadState(
     modelConfigured: activeProvider() !== "none",
     modelLabel: modelLabel(),
     demoEntry: await findDemoEntry(users, sessionsByUser),
-    accounts,
+    documents,
   };
 }
 

@@ -121,3 +121,22 @@ export interface Account {
   renews_on: string;
   notes: string;
 }
+
+/**
+ * A document is reference material an answer can cite — an account book, a
+ * pricing sheet, a runbook. Not a rule, but scoped by the same predicate:
+ * whether a Finance pricing sheet exists is as much a permission question as
+ * whether a Finance pricing rule applies.
+ */
+export interface Doc {
+  id: string;
+  scope: Scope;
+  owner_user_id: string | null;
+  team_id: string | null;
+  org_id: string | null;
+  title: string;
+  summary: string;
+  body: string;
+  created_by: string;
+  created_at: string;
+}

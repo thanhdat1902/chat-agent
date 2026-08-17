@@ -1,6 +1,6 @@
 import type { InValue } from "@libsql/client";
 import { all, one } from "./db";
-import type { Actor, Memory, Scope, User } from "./types";
+import type { Actor, Doc, Memory, Scope, User } from "./types";
 
 /** Single organization in this prototype; the column exists so the boundary is real. */
 export const ORG_ID = "org_main";
@@ -68,25 +68,36 @@ export interface Clause {
  * visible only to their author, so an unconfirmed org rule never reaches
  * anyone else's agent or inspector.
  */
-export function visibilityClause(actor: Actor, alias = "m"): Clause {
+/**
+ * The scope rule on its own, with no table-specific columns beyond scope /
+ * team_id / owner_user_id. Memories and documents are different kinds of
+ * knowledge but they answer to exactly the same boundary — this is the single
+ * definition both are built from, so there is no second implementation to
+ * drift.
+ */
+export function scopePredicate(actor: Actor, alias = "m"): Clause {
   const a = alias;
   const teamPlaceholders = actor.teamIds.map(() => "?").join(", ");
   const teamPredicate = actor.teamIds.length
     ? `(${a}.scope = 'team' AND ${a}.team_id IN (${teamPlaceholders}))`
-    : `(1 = 0)`; // no team membership -> no team memories, ever
+    : `(1 = 0)`; // no team membership -> no team rows, ever
 
-  const sql = `(
-      (
+  return {
+    sql: `(
         ${a}.scope = 'org'
         OR ${teamPredicate}
         OR (${a}.scope = 'personal' AND ${a}.owner_user_id = ?)
-      )
-      AND (${a}.status <> 'pending' OR ${a}.created_by = ?)
-    )`;
+      )`,
+    args: [...actor.teamIds, actor.user.id],
+  };
+}
 
+/** The scope rule plus the memory-only guard that hides unratified proposals. */
+export function visibilityClause(actor: Actor, alias = "m"): Clause {
+  const scope = scopePredicate(actor, alias);
   return {
-    sql,
-    args: [...actor.teamIds, actor.user.id, actor.user.id],
+    sql: `(${scope.sql} AND (${alias}.status <> 'pending' OR ${alias}.created_by = ?))`,
+    args: [...scope.args, actor.user.id],
   };
 }
 
@@ -161,4 +172,31 @@ export function assertCanMutate(actor: Actor, memory: Memory): void {
   if (memory.scope === "team" && !actor.teamIds.includes(memory.team_id ?? "")) {
     throw new HttpError(403, "Team memories can only be changed by members of that team.");
   }
+}
+
+// ---------------------------------------------------------------------------
+// Documents — reference material, scoped by exactly the same predicate.
+// ---------------------------------------------------------------------------
+
+/**
+ * Documents are not rules: they are the material an answer cites. They are
+ * scoped anyway, because "which pricing sheet exists" is as much a permission
+ * question as "which pricing rule applies". Reusing `scopePredicate` means the
+ * boundary is not re-implemented for a second kind of data.
+ */
+export async function listVisibleDocuments(actor: Actor): Promise<Doc[]> {
+  const s = scopePredicate(actor, "d");
+  return all<Doc>(
+    `SELECT d.* FROM documents d WHERE ${s.sql} ORDER BY
+       CASE d.scope WHEN 'org' THEN 0 WHEN 'team' THEN 1 ELSE 2 END, d.title`,
+    s.args,
+  );
+}
+
+export async function getDocumentAs(actor: Actor, docId: string): Promise<Doc | null> {
+  const s = scopePredicate(actor, "d");
+  return one<Doc>(`SELECT d.* FROM documents d WHERE d.id = ? AND ${s.sql}`, [
+    docId,
+    ...s.args,
+  ]);
 }

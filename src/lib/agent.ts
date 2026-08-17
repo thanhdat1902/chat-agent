@@ -1,7 +1,7 @@
 import { activeProvider, completeText } from "./llm";
 import { precedence } from "./memory";
-import { all } from "./db";
-import type { Account, Actor, Memory, Message, RetrievalResult } from "./types";
+import { listVisibleDocuments } from "./permissions";
+import type { Actor, Doc, Memory, Message, RetrievalResult } from "./types";
 
 function scopeLabel(m: Memory, teamName: string): string {
   if (m.scope === "org") return m.binding ? "ORG POLICY (binding)" : "ORG";
@@ -20,56 +20,45 @@ function scopeLabel(m: Memory, teamName: string): string {
  * instruction, because rules the user is not entitled to were never fetched.
  * The prompt is the last mile, not the boundary.
  */
-export async function loadAccounts(): Promise<Account[]> {
-  return all<Account>(
-    `SELECT name, seats, prior_term_usd, q3_sheet_usd, rate_card_usd, renews_on, notes
-       FROM accounts ORDER BY name`,
-  );
-}
-
-const usd = (n: number) => `$${n.toLocaleString("en-US")}`;
+const scopeTag = (d: Doc, teamName: string) =>
+  d.scope === "org" ? "ORG" : d.scope === "team" ? `TEAM · ${teamName}` : "PERSONAL";
 
 /**
- * Shared reference data, identical for every user. It is deliberately NOT
- * memory: keeping it constant means any difference between two users' answers
- * is attributable to the memories they hold and nothing else. It also gives
- * the rules something concrete to bite on — a rule naming the Q3 sheet only
- * demonstrates anything if both the Q3 and rate-card figures are available.
+ * Reference material the answer may cite. These arrive already filtered by the
+ * same scope predicate that filters memories — so a Finance pricing sheet is
+ * simply absent from an Operations prompt, exactly as a Finance rule is.
+ *
+ * The prompt says plainly that the set is scoped and may be incomplete, so the
+ * agent says "I don't have that" rather than inventing the missing figures.
  */
-function accountBook(accounts: Account[]): string {
-  if (accounts.length === 0) return "";
-  const rows = accounts
-    .map(
-      (a) =>
-        `| ${a.name} | ${a.seats} | ${usd(a.prior_term_usd)} | ${usd(a.q3_sheet_usd)} | ${usd(
-          a.rate_card_usd,
-        )} | ${a.renews_on} | ${a.notes} |`,
-    )
-    .join("\n");
+function documentBlock(docs: Doc[], teamName: string): string {
+  if (docs.length === 0) return "";
+  const sections = docs
+    .map((d) => `### ${d.title}  [${scopeTag(d, teamName)}]\n${d.summary}\n\n${d.body}`)
+    .join("\n\n");
   return `
 
-ACCOUNT BOOK (internal reference, current figures)
-| Account | Seats | Prior term | Q3 pricing sheet | Public rate card | Renews | Notes |
-|---|---|---|---|---|---|---|
-${rows}
+REFERENCE DOCUMENTS
+These are the documents you have access to. Cite figures from them rather than inventing any.
+This set is scoped to you and may not be everything that exists in the company — if answering
+needs a document you do not have here, say what is missing and that it needs to come from
+whoever owns it. Do not guess at its contents.
 
-Cite the account by name and use these figures rather than inventing any.
-
-The book deliberately lists more than one pricing source. Which one applies is a matter of team policy, and is NOT something you can infer from this table or from the column names — recency, label, and which number is lower are all irrelevant. If a standing rule below tells you which source to quote, follow it. If no rule does, say plainly that you do not know which pricing source applies here and that it needs confirming, rather than picking one yourself.`;
+${sections}`;
 }
 
 export function buildSystemPrompt(
   actor: Actor,
   retrieval: RetrievalResult,
   authors: Map<string, string>,
-  accounts: Account[] = [],
+  docs: Doc[] = [],
 ): string {
   const teamName = actor.teamNames[0] ?? "no team";
   const header = `You are the workplace assistant for ${actor.user.name} (${actor.user.role}), on the ${teamName} team.
 
 Answer the way a sharp colleague would: get to the point, be concrete, and use the team's own vocabulary. Keep replies short unless the question needs depth.`;
 
-  const book = accountBook(accounts);
+  const book = documentBlock(docs, teamName);
 
   if (retrieval.injected.length === 0) {
     return `${header}${book}\n\nNo standing rules apply to this conversation yet.`;
@@ -103,7 +92,7 @@ export async function generateReply(
   retrieval: RetrievalResult,
   authors: Map<string, string>,
 ): Promise<string> {
-  const system = buildSystemPrompt(actor, retrieval, authors, await loadAccounts());
+  const system = buildSystemPrompt(actor, retrieval, authors, await listVisibleDocuments(actor));
 
   if (activeProvider() === "none") return offlineReply(retrieval, authors);
 
