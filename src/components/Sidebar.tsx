@@ -21,23 +21,24 @@ export default function Sidebar({
         <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
           Agent Memory
         </div>
-        <div className="mt-2 flex items-center gap-2">
-          <label className="text-xs text-[var(--muted)]">Acting as</label>
-          <select
-            value={state.actor.id}
-            onChange={(e) => onSwitchUser(e.target.value)}
-            className="flex-1 rounded-md border border-[var(--line)] bg-white px-2 py-1.5 text-sm font-medium outline-none focus:border-[var(--accent)]"
-          >
-            {state.users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name} — {u.teamNames[0] ?? "No team"}
-              </option>
-            ))}
-          </select>
+        <div className="mt-2 rounded-md border border-[var(--line)] bg-[#f8fafc] px-2.5 py-2">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+            Acting as
+          </div>
+          <div className="mt-1 flex items-center gap-2">
+            <span
+              className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ background: state.actor.color }}
+            />
+            <span className="text-sm font-semibold">{state.actor.name}</span>
+            <span className="rounded border border-[var(--line)] bg-white px-1.5 py-[1px] text-[10px] font-medium text-[var(--muted)]">
+              {state.actor.teamNames[0] ?? "No team"}
+            </span>
+          </div>
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-[var(--muted)]">
-          Everyone&apos;s chats are listed. Opening someone else&apos;s session switches you to
-          them — memory visibility always follows whoever you are acting as.
+          Open anyone&apos;s chat and this switches to them — memory visibility always follows
+          whoever you are acting as.
         </p>
         <button
           onClick={() => onSelectSession("u_sean", "s_sean_3")}
@@ -60,11 +61,15 @@ export default function Sidebar({
                   className="inline-block h-2 w-2 rounded-full"
                   style={{ background: u.color }}
                 />
-                <h2
-                  className={`text-sm ${isActor ? "font-bold" : "font-semibold text-[#33383d]"}`}
+                <button
+                  onClick={() => onSwitchUser(u.id)}
+                  title={`Act as ${u.name}`}
+                  className={`rounded text-left text-sm hover:underline ${
+                    isActor ? "font-bold" : "font-semibold text-[#33383d]"
+                  }`}
                 >
                   {u.name}&apos;s chats
-                </h2>
+                </button>
                 {u.teamNames.map((t) => (
                   <span
                     key={t}

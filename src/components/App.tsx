@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { AppState } from "@/lib/state";
 import Sidebar from "./Sidebar";
 import Conversation from "./Conversation";
@@ -17,28 +17,54 @@ export interface ChatMeta {
 export default function App({ initial }: { initial: AppState }) {
   const [state, setState] = useState<AppState>(initial);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [lastMeta, setLastMeta] = useState<ChatMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
 
+  /**
+   * Session switches used to wait on a full round trip before anything moved,
+   * which read as a freeze. The sidebar and header can be updated from data
+   * the client already holds, so selection is applied immediately and only the
+   * transcript and memory panel wait — with a visible loading state.
+   *
+   * Requests are sequenced so a slow response for a session you already
+   * navigated away from cannot overwrite a newer one.
+   */
+  const requestSeq = useRef(0);
+
   const refresh = useCallback(
-    async (userId: string, sessionId: string | null) => {
-      const qs = new URLSearchParams({ userId });
-      if (sessionId) qs.set("sessionId", sessionId);
-      const res = await fetch(`/api/state?${qs}`, { cache: "no-store" });
-      const next = (await res.json()) as AppState;
-      setState(next);
-      setLastMeta(null);
+    async (userId: string, sessionId: string | null, optimistic = false) => {
+      const seq = ++requestSeq.current;
+      if (!optimistic) setLoading(true);
+      try {
+        const qs = new URLSearchParams({ userId });
+        if (sessionId) qs.set("sessionId", sessionId);
+        const res = await fetch(`/api/state?${qs}`, { cache: "no-store" });
+        const next = (await res.json()) as AppState;
+        if (seq !== requestSeq.current) return; // superseded by a newer click
+        setState(next);
+        setLastMeta(null);
+      } finally {
+        if (seq === requestSeq.current) setLoading(false);
+      }
     },
     [],
   );
 
   const selectSession = useCallback(
     (userId: string, sessionId: string) => {
-      void refresh(userId, sessionId);
+      if (sessionId === state.activeSessionId && userId === state.actor.id) return;
+      const nextActor = state.users.find((u) => u.id === userId) ?? state.actor;
+      // Paint the selection now from what we already have; the transcript and
+      // the memory panel fill in when the fetch lands.
+      setState((s) => ({ ...s, actor: nextActor, activeSessionId: sessionId, messages: [] }));
+      setLastMeta(null);
+      setLoading(true);
+      void refresh(userId, sessionId, true);
     },
-    [refresh],
+    [refresh, state.activeSessionId, state.actor, state.users],
   );
 
   const send = useCallback(
@@ -164,6 +190,7 @@ export default function App({ initial }: { initial: AppState }) {
           state={state}
           session={activeSession}
           busy={busy}
+          loading={loading}
           error={error}
           lastMeta={lastMeta}
           onSend={send}

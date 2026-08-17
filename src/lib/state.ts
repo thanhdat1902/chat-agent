@@ -1,8 +1,8 @@
 import { all } from "./db";
-import { listVisibleMemories, loadActor } from "./permissions";
-import { PRECEDENCE_LADDER, precedence, memoryEvents } from "./memory";
+import { listVisibleMemories } from "./permissions";
+import { PRECEDENCE_LADDER, precedence } from "./memory";
 import { activeProvider, modelLabel } from "./llm";
-import type { ChatSession, Memory, MemoryEvent, Message, User } from "./types";
+import type { Actor, ChatSession, Memory, MemoryEvent, Message, User } from "./types";
 
 export interface UserWithTeams extends User {
   teamIds: string[];
@@ -30,30 +30,62 @@ export interface AppState {
   modelLabel: string;
 }
 
+/**
+ * Every round trip here crosses a region boundary, so the shape of this file
+ * is latency-driven: independent queries run concurrently, and nothing runs
+ * once per row. An earlier version fetched each memory's audit trail in its
+ * own query, which put a full round trip per memory on the critical path of
+ * every session switch.
+ */
 async function usersWithTeams(): Promise<UserWithTeams[]> {
-  const users = await all<User>(`SELECT * FROM users ORDER BY rowid`);
-  const rows = await all<{ user_id: string; id: string; name: string }>(
-    `SELECT m.user_id, t.id, t.name FROM team_members m JOIN teams t ON t.id = m.team_id`,
-  );
+  const [users, rows] = await Promise.all([
+    all<User>(`SELECT * FROM users ORDER BY rowid`),
+    all<{ user_id: string; id: string; name: string }>(
+      `SELECT m.user_id, t.id, t.name FROM team_members m JOIN teams t ON t.id = m.team_id`,
+    ),
+  ]);
   return users.map((u) => {
     const mine = rows.filter((r) => r.user_id === u.id);
     return { ...u, teamIds: mine.map((r) => r.id), teamNames: mine.map((r) => r.name) };
   });
 }
 
-export async function loadMemoryViews(userId: string): Promise<MemoryView[]> {
-  const actor = await loadActor(userId);
+function toActor(u: UserWithTeams): Actor {
+  return { user: u, teamIds: u.teamIds, teamNames: u.teamNames };
+}
+
+export async function buildMemoryViews(
+  actor: Actor,
+  users: UserWithTeams[],
+): Promise<MemoryView[]> {
   const memories = await listVisibleMemories(actor);
-  const users = await all<User>(`SELECT id, name FROM users`);
-  const teams = await all<{ id: string; name: string }>(`SELECT id, name FROM teams`);
+  if (memories.length === 0) return [];
+
+  // One query for every audit trail, rather than one per memory.
+  const placeholders = memories.map(() => "?").join(", ");
+  const [events, teams] = await Promise.all([
+    all<MemoryEvent>(
+      `SELECT * FROM memory_events WHERE memory_id IN (${placeholders}) ORDER BY created_at ASC`,
+      memories.map((m) => m.id),
+    ),
+    all<{ id: string; name: string }>(`SELECT id, name FROM teams`),
+  ]);
+
+  const eventsByMemory = new Map<string, MemoryEvent[]>();
+  for (const e of events) {
+    const list = eventsByMemory.get(e.memory_id) ?? [];
+    list.push(e);
+    eventsByMemory.set(e.memory_id, list);
+  }
+
   const nameOf = new Map(users.map((u) => [u.id, u.name]));
   const teamOf = new Map(teams.map((t) => [t.id, t.name]));
 
   // Conflict resolution mirrored here so the inspector can show which memory
   // is currently losing — computed over the same visible set the agent uses.
-  const active = memories.filter((m) => m.status === "active");
   const winnerByKey = new Map<string, Memory>();
-  for (const m of active) {
+  for (const m of memories) {
+    if (m.status !== "active") continue;
     const cur = winnerByKey.get(m.key);
     if (!cur || precedence(m) > precedence(cur)) winnerByKey.set(m.key, m);
   }
@@ -63,36 +95,42 @@ export async function loadMemoryViews(userId: string): Promise<MemoryView[]> {
     if (m.supersedes_id) supersededBy.set(m.supersedes_id, m);
   }
 
-  const views: MemoryView[] = [];
-  for (const m of memories) {
+  return memories.map((m) => {
     const winner = winnerByKey.get(m.key);
     const sup = supersededBy.get(m.id);
-    views.push({
+    return {
       ...m,
       authorName: nameOf.get(m.created_by) ?? "Unknown",
       teamName: m.team_id ? (teamOf.get(m.team_id) ?? null) : null,
       precedence: precedence(m),
-      events: await memoryEvents(m.id),
+      events: eventsByMemory.get(m.id) ?? [],
       overriddenBy:
         m.status === "active" && winner && winner.id !== m.id
           ? { id: winner.id, content: winner.content, scope: winner.scope }
           : null,
       supersededBy: sup ? { id: sup.id, content: sup.content } : null,
-    });
-  }
-  return views;
+    };
+  });
+}
+
+/** Kept for callers that only have a user id. */
+export async function loadMemoryViews(userId: string): Promise<MemoryView[]> {
+  const users = await usersWithTeams();
+  const actor = users.find((u) => u.id === userId);
+  if (!actor) return [];
+  return buildMemoryViews(toActor(actor), users);
 }
 
 export async function loadState(
   userId: string,
   sessionId: string | null,
 ): Promise<AppState> {
-  const users = await usersWithTeams();
-  const actor = users.find((u) => u.id === userId) ?? users[0];
+  const [users, sessions] = await Promise.all([
+    usersWithTeams(),
+    all<ChatSession>(`SELECT * FROM sessions ORDER BY user_id, seq`),
+  ]);
 
-  const sessions = await all<ChatSession>(
-    `SELECT * FROM sessions ORDER BY user_id, seq`,
-  );
+  const actor = users.find((u) => u.id === userId) ?? users[0];
   const sessionsByUser: Record<string, ChatSession[]> = {};
   for (const u of users) sessionsByUser[u.id] = [];
   for (const s of sessions) (sessionsByUser[s.user_id] ??= []).push(s);
@@ -102,7 +140,10 @@ export async function loadState(
       ? sessionId
       : (sessionsByUser[actor.id]?.[0]?.id ?? null);
 
-  const messages = active ? await loadMessages(active) : [];
+  const [messages, memories] = await Promise.all([
+    active ? loadMessages(active) : Promise.resolve([]),
+    buildMemoryViews(toActor(actor), users),
+  ]);
 
   return {
     actor,
@@ -110,7 +151,7 @@ export async function loadState(
     sessionsByUser,
     activeSessionId: active,
     messages,
-    memories: await loadMemoryViews(actor.id),
+    memories,
     ladder: PRECEDENCE_LADDER,
     modelConfigured: activeProvider() !== "none",
     modelLabel: modelLabel(),
@@ -118,21 +159,31 @@ export async function loadState(
 }
 
 export async function loadMessages(sessionId: string): Promise<Message[]> {
-  const rows = await all<Omit<Message, "used_memory_ids" | "created_memory_ids">>(
-    `SELECT * FROM messages WHERE session_id = ? ORDER BY created_at ASC, rowid ASC`,
-    [sessionId],
-  );
-  const links = await all<{ message_id: string; memory_id: string; relation: string }>(
-    `SELECT mm.* FROM message_memories mm
-       JOIN messages m ON m.id = mm.message_id
-      WHERE m.session_id = ?`,
-    [sessionId],
-  );
+  const [rows, links] = await Promise.all([
+    all<Omit<Message, "used_memory_ids" | "created_memory_ids">>(
+      `SELECT * FROM messages WHERE session_id = ? ORDER BY created_at ASC, rowid ASC`,
+      [sessionId],
+    ),
+    all<{ message_id: string; memory_id: string; relation: string }>(
+      `SELECT mm.* FROM message_memories mm
+         JOIN messages m ON m.id = mm.message_id
+        WHERE m.session_id = ?`,
+      [sessionId],
+    ),
+  ]);
+
+  const used = new Map<string, string[]>();
+  const created = new Map<string, string[]>();
+  for (const l of links) {
+    const target = l.relation === "used" ? used : created;
+    const list = target.get(l.message_id) ?? [];
+    list.push(l.memory_id);
+    target.set(l.message_id, list);
+  }
+
   return rows.map((r) => ({
     ...r,
-    used_memory_ids: links.filter((l) => l.message_id === r.id && l.relation === "used").map((l) => l.memory_id),
-    created_memory_ids: links
-      .filter((l) => l.message_id === r.id && l.relation === "created")
-      .map((l) => l.memory_id),
+    used_memory_ids: used.get(r.id) ?? [],
+    created_memory_ids: created.get(r.id) ?? [],
   }));
 }

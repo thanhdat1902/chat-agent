@@ -34,6 +34,7 @@ export default function Conversation({
   state,
   session,
   busy,
+  loading,
   error,
   lastMeta,
   onSend,
@@ -42,6 +43,7 @@ export default function Conversation({
   state: AppState;
   session: ChatSession | null;
   busy: boolean;
+  loading: boolean;
   error: string | null;
   lastMeta: ChatMeta | null;
   onSend: (content: string) => void;
@@ -92,7 +94,27 @@ export default function Conversation({
 
       <div className="scroll-thin flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto max-w-3xl space-y-5">
-          {state.messages.length === 0 && (
+          {loading && (
+            <div className="space-y-4" aria-live="polite" aria-busy="true">
+              <div className="flex items-center gap-2 text-[12px] text-[var(--muted)]">
+                <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--accent)]" />
+                Loading conversation…
+              </div>
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className={`flex ${i % 2 ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className="h-12 animate-pulse rounded-2xl bg-[#eef1f4]"
+                    style={{ width: `${[62, 44, 72][i]}%` }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!loading && state.messages.length === 0 && (
             <div className="rounded-lg border border-dashed border-[var(--line)] bg-white p-5">
               <h3 className="text-sm font-semibold">Fresh chat as {state.actor.name}</h3>
               <p className="mt-1 text-[13px] text-[var(--muted)]">
@@ -123,7 +145,7 @@ export default function Conversation({
             </div>
           )}
 
-          {state.messages.map((m) => {
+          {!loading && state.messages.map((m) => {
             const pending = state.memories.filter(
               (mem) => mem.source_message_id === m.id && mem.status === "pending",
             );
@@ -285,12 +307,15 @@ export default function Conversation({
               }
             }}
             rows={1}
-            placeholder={`Type to message as ${state.actor.name}…`}
+            disabled={loading}
+            placeholder={
+              loading ? "Loading…" : `Type to message as ${state.actor.name}…`
+            }
             className="scroll-thin max-h-40 min-h-[44px] flex-1 resize-none rounded-lg border border-[var(--line)] px-3.5 py-3 text-[14px] outline-none focus:border-[var(--accent)]"
           />
           <button
             onClick={submit}
-            disabled={busy || !draft.trim()}
+            disabled={busy || loading || !draft.trim()}
             className="h-[44px] rounded-lg bg-[var(--accent)] px-5 text-sm font-medium text-white transition disabled:opacity-40"
           >
             Send
