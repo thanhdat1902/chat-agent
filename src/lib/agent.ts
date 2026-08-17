@@ -1,7 +1,7 @@
 import { activeProvider, completeText } from "./llm";
 import { precedence } from "./memory";
 import { all } from "./db";
-import type { Actor, Memory, Message, RetrievalResult } from "./types";
+import type { Account, Actor, Memory, Message, RetrievalResult } from "./types";
 
 function scopeLabel(m: Memory, teamName: string): string {
   if (m.scope === "org") return m.binding ? "ORG POLICY (binding)" : "ORG";
@@ -20,16 +20,6 @@ function scopeLabel(m: Memory, teamName: string): string {
  * instruction, because rules the user is not entitled to were never fetched.
  * The prompt is the last mile, not the boundary.
  */
-export interface Account {
-  name: string;
-  seats: number;
-  prior_term_usd: number;
-  q3_sheet_usd: number;
-  rate_card_usd: number;
-  renews_on: string;
-  notes: string;
-}
-
 export async function loadAccounts(): Promise<Account[]> {
   return all<Account>(
     `SELECT name, seats, prior_term_usd, q3_sheet_usd, rate_card_usd, renews_on, notes

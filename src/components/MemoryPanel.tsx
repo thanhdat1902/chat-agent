@@ -11,7 +11,7 @@ export type RequestConfirm = (
   opts: Omit<ConfirmRequest, "onConfirm"> & { run: () => Promise<Response> },
 ) => void;
 
-type Tab = "memory" | "precedence" | "leak";
+type Tab = "memory" | "reference" | "precedence" | "leak";
 
 
 export default function MemoryPanel({
@@ -32,7 +32,8 @@ export default function MemoryPanel({
       <nav className="flex border-b border-[var(--line)]">
         {(
           [
-            ["memory", `What ${state.actor.name} knows`],
+            ["memory", "Memory"],
+            ["reference", "Shared data"],
             ["precedence", "Precedence"],
             ["leak", "Leak test"],
           ] as [Tab, string][]
@@ -40,7 +41,7 @@ export default function MemoryPanel({
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex-1 px-3 py-2.5 text-[12px] font-medium transition ${
+            className={`flex-1 px-1.5 py-2.5 text-[11.5px] font-medium transition ${
               tab === key
                 ? "border-b-2 border-[var(--accent)] text-[var(--accent)]"
                 : "text-[var(--muted)] hover:text-[var(--ink)]"
@@ -60,6 +61,7 @@ export default function MemoryPanel({
             onRequestConfirm={onRequestConfirm}
           />
         )}
+        {tab === "reference" && <Reference state={state} />}
         {tab === "precedence" && <Precedence state={state} />}
         {tab === "leak" && <LeakTest state={state} />}
       </div>
@@ -317,6 +319,83 @@ function MemoryCard({
         </button>
       </div>
     </li>
+  );
+}
+
+
+const money = (n: number) => `$${n.toLocaleString("en-US")}`;
+
+/**
+ * The account book, shown so it is obvious the agent is citing something real
+ * — and equally obvious that it is NOT memory. Every user sees this identical
+ * table, which is what makes a difference between two users' answers
+ * attributable to the memories they hold.
+ */
+function Reference({ state }: { state: AppState }) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-md border border-[var(--line)] bg-[#f8fafc] px-3 py-2.5">
+        <div className="flex items-center gap-1.5">
+          <span className="rounded border border-[#ccd4f5] bg-[#eef1fd] px-1.5 py-[1px] text-[10px] font-semibold uppercase tracking-wide text-[#3b4bb3]">
+            Organization-wide
+          </span>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+            not memory
+          </span>
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-[var(--muted)]">
+          The company account book. Every user sees this same table, unfiltered — it is reference
+          data, not a rule, so it is never scoped and never appears in the memory panel. Holding
+          it constant is deliberate: when two people ask the same question and get different
+          answers, the data was identical, so the difference came from memory.
+        </p>
+        <p className="mt-2 text-[11px] leading-relaxed text-[var(--muted)]">
+          It carries <em>both</em> pricing sources on purpose. Which one to quote is team policy —
+          the table says so explicitly — so an agent with no rule about it declines to choose.
+        </p>
+      </div>
+
+      {state.accounts.length === 0 ? (
+        <p className="rounded-md border border-dashed border-[var(--line)] px-3 py-3 text-[12px] text-[var(--muted)]">
+          No accounts loaded.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {state.accounts.map((a) => (
+            <li key={a.name} className="rounded-lg border border-[var(--line)] px-3 py-2.5">
+              <div className="flex items-baseline justify-between">
+                <span className="text-[13px] font-semibold">{a.name}</span>
+                <span className="text-[11px] text-[var(--muted)]">{a.seats} seats</span>
+              </div>
+              <dl className="mt-1.5 space-y-0.5 text-[12px]">
+                <div className="flex justify-between">
+                  <dt className="text-[var(--muted)]">Prior term</dt>
+                  <dd className="font-mono">{money(a.prior_term_usd)}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-[var(--muted)]">Q3 pricing sheet</dt>
+                  <dd className="font-mono">{money(a.q3_sheet_usd)}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-[var(--muted)]">Public rate card</dt>
+                  <dd className="font-mono">{money(a.rate_card_usd)}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-[var(--muted)]">Renews</dt>
+                  <dd className="font-mono">{a.renews_on}</dd>
+                </div>
+              </dl>
+              <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--muted)]">{a.notes}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="rounded-md border border-[var(--line)] px-3 py-2 text-[11px] leading-relaxed text-[var(--muted)]">
+        Seeded in <span className="font-mono">src/lib/seed.ts</span> and injected into every
+        system prompt. Edit it there and run <span className="font-mono">npm run reset</span>.
+      </p>
+    </div>
   );
 }
 

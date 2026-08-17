@@ -105,3 +105,19 @@ export interface ExtractedRule {
   quote: string;
   supersedes_id?: string | null;
 }
+
+/**
+ * Shared reference data — the company's account book. Deliberately NOT a
+ * memory: unscoped, identical for every user, and never filtered. Holding it
+ * constant is what makes a difference between two users' answers attributable
+ * to memory alone.
+ */
+export interface Account {
+  name: string;
+  seats: number;
+  prior_term_usd: number;
+  q3_sheet_usd: number;
+  rate_card_usd: number;
+  renews_on: string;
+  notes: string;
+}
