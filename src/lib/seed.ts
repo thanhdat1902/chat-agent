@@ -41,15 +41,17 @@ export const DOCUMENTS = [
     team: null,
     title: "Account book",
     summary: "Customers, seats, prior-term value, public list pricing and renewal dates.",
-    // Notes state facts only. Whether a plan date may be promised to a customer
-    // is policy, and policy lives in memory — a document that says "engineering
-    // has not signed off" pre-empts the very rule the demo is meant to prove.
+    // Notes record customer status and nothing else — no dates, no approval
+    // state, no guidance. Anything resembling a decision ("engineering has not
+    // signed off", "the plan targets 30 September") would answer the question
+    // the rules exist to answer, and the demo would prove nothing. The user's
+    // own message supplies the date; memory supplies the policy.
     body: [
       "| Account | Seats | Prior term | Public rate card | Renews | Notes |",
       "|---|---|---|---|---|---|",
-      "| Northwind | 240 | $84,000 | $91,200 | 2026-09-30 | SSO integration requested; the internal delivery plan currently targets 30 September. |",
-      "| Acme | 150 | $52,000 | $58,000 | 2026-10-12 | Asking when SSO ships; the internal delivery plan currently targets 30 September. |",
-      "| Contoso | 600 | $128,000 | $142,500 | 2027-01-31 | Expanding into two more regions next term; wants volume pricing. |",
+      "| Northwind | 240 | $84,000 | $91,200 | 2026-09-30 | Renewal in progress. Has asked about the SSO integration. |",
+      "| Acme | 150 | $52,000 | $58,000 | 2026-10-12 | Renewal in progress. Has asked when the SSO integration ships. |",
+      "| Contoso | 600 | $128,000 | $142,500 | 2027-01-31 | Expanding into two more regions next term. |",
     ].join("\n"),
     created_by: "u_ryan",
     daysAgo: 45,
