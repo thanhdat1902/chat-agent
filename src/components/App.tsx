@@ -67,6 +67,26 @@ export default function App({ initial }: { initial: AppState }) {
     [refresh, state.activeSessionId, state.actor, state.users],
   );
 
+  /** Switching by name is optimistic too, so the header moves on click. */
+  const switchUser = useCallback(
+    (userId: string) => {
+      if (userId === state.actor.id) return;
+      const nextActor = state.users.find((u) => u.id === userId);
+      if (!nextActor) return;
+      const firstSession = state.sessionsByUser[userId]?.[0]?.id ?? null;
+      setState((s) => ({
+        ...s,
+        actor: nextActor,
+        activeSessionId: firstSession,
+        messages: [],
+      }));
+      setLastMeta(null);
+      setLoading(true);
+      void refresh(userId, firstSession, true);
+    },
+    [refresh, state.actor.id, state.users, state.sessionsByUser],
+  );
+
   const send = useCallback(
     async (content: string) => {
       if (!state.activeSessionId || busy) return;
@@ -180,7 +200,7 @@ export default function App({ initial }: { initial: AppState }) {
       <Sidebar
         state={state}
         onSelectSession={selectSession}
-        onSwitchUser={(u) => void refresh(u, null)}
+        onSwitchUser={switchUser}
         onNewSession={newSession}
         onDeleteSession={requestDeleteSession}
       />
