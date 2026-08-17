@@ -20,6 +20,67 @@ import { ORG_ID } from "./permissions";
  * default), a superseded memory, and an unratified org proposal.
  */
 
+
+/**
+ * A small account book — shared reference data, not memory.
+ *
+ * It exists so the memory rules have something concrete to act on: the Finance
+ * rule says "quote off the Q3 sheet, not the public rate card", and both
+ * figures are here, so following the rule produces a visibly different number.
+ * Every user sees the same book, so any difference between two users' answers
+ * is attributable to memory and nothing else.
+ */
+export const ACCOUNTS = [
+  {
+    id: "acct_northwind",
+    name: "Northwind",
+    seats: 240,
+    prior_term_usd: 84_000,
+    q3_sheet_usd: 87_400,
+    rate_card_usd: 91_200,
+    renews_on: "2026-09-30",
+    notes: "SSO integration requested; sitting in the engineering backlog with no committed date.",
+  },
+  {
+    id: "acct_acme",
+    name: "Acme",
+    seats: 150,
+    prior_term_usd: 52_000,
+    q3_sheet_usd: 54_600,
+    rate_card_usd: 58_000,
+    renews_on: "2026-10-12",
+    notes: "Asking when SSO ships. Engineering has not signed off on a date.",
+  },
+  {
+    id: "acct_contoso",
+    name: "Contoso",
+    seats: 600,
+    prior_term_usd: 128_000,
+    q3_sheet_usd: 131_000,
+    rate_card_usd: 142_500,
+    renews_on: "2027-01-31",
+    notes: "Expanding into two more regions next term; wants volume pricing.",
+  },
+];
+
+function accountStatements() {
+  return ACCOUNTS.map((a) => ({
+    sql: `INSERT OR IGNORE INTO accounts
+            (id, name, seats, prior_term_usd, q3_sheet_usd, rate_card_usd, renews_on, notes)
+          VALUES (?,?,?,?,?,?,?,?)`,
+    args: [
+      a.id,
+      a.name,
+      a.seats,
+      a.prior_term_usd,
+      a.q3_sheet_usd,
+      a.rate_card_usd,
+      a.renews_on,
+      a.notes,
+    ] as (string | number | null)[],
+  }));
+}
+
 const DAY = 86_400_000;
 function daysAgo(n: number, hour = 10): string {
   const d = new Date(Date.now() - n * DAY);
@@ -687,6 +748,7 @@ export async function seedIfEmpty(c: Client): Promise<void> {
     });
   }
 
+  stmts.push(...accountStatements());
   await c.batch(stmts, "write");
 }
 
@@ -725,6 +787,8 @@ export async function seedBlank(c: Client): Promise<void> {
       args: [`s_${u.id.replace("u_", "")}_1`, u.id, "Chat session #1 — New chat", 1, daysAgo(0)],
     });
   }
+  // The account book is the world, not memory — present in both modes.
+  stmts.push(...accountStatements());
 
   await c.batch(stmts, "write");
 }

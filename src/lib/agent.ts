@@ -1,5 +1,6 @@
 import { activeProvider, completeText } from "./llm";
 import { precedence } from "./memory";
+import { all } from "./db";
 import type { Actor, Memory, Message, RetrievalResult } from "./types";
 
 function scopeLabel(m: Memory, teamName: string): string {
@@ -19,18 +20,67 @@ function scopeLabel(m: Memory, teamName: string): string {
  * instruction, because rules the user is not entitled to were never fetched.
  * The prompt is the last mile, not the boundary.
  */
+export interface Account {
+  name: string;
+  seats: number;
+  prior_term_usd: number;
+  q3_sheet_usd: number;
+  rate_card_usd: number;
+  renews_on: string;
+  notes: string;
+}
+
+export async function loadAccounts(): Promise<Account[]> {
+  return all<Account>(
+    `SELECT name, seats, prior_term_usd, q3_sheet_usd, rate_card_usd, renews_on, notes
+       FROM accounts ORDER BY name`,
+  );
+}
+
+const usd = (n: number) => `$${n.toLocaleString("en-US")}`;
+
+/**
+ * Shared reference data, identical for every user. It is deliberately NOT
+ * memory: keeping it constant means any difference between two users' answers
+ * is attributable to the memories they hold and nothing else. It also gives
+ * the rules something concrete to bite on — a rule naming the Q3 sheet only
+ * demonstrates anything if both the Q3 and rate-card figures are available.
+ */
+function accountBook(accounts: Account[]): string {
+  if (accounts.length === 0) return "";
+  const rows = accounts
+    .map(
+      (a) =>
+        `| ${a.name} | ${a.seats} | ${usd(a.prior_term_usd)} | ${usd(a.q3_sheet_usd)} | ${usd(
+          a.rate_card_usd,
+        )} | ${a.renews_on} | ${a.notes} |`,
+    )
+    .join("\n");
+  return `
+
+ACCOUNT BOOK (internal reference, current figures)
+| Account | Seats | Prior term | Q3 pricing sheet | Public rate card | Renews | Notes |
+|---|---|---|---|---|---|---|
+${rows}
+
+Use these figures when they are relevant, and cite the account by name. Do not invent numbers that are not in this table. If a standing rule tells you which pricing source to use, use that column.`;
+}
+
 export function buildSystemPrompt(
   actor: Actor,
   retrieval: RetrievalResult,
   authors: Map<string, string>,
+  accounts: Account[] = [],
 ): string {
   const teamName = actor.teamNames[0] ?? "no team";
   const header = `You are the workplace assistant for ${actor.user.name} (${actor.user.role}), on the ${teamName} team.
 
 Answer the way a sharp colleague would: get to the point, be concrete, and use the team's own vocabulary. Keep replies short unless the question needs depth.`;
 
+  const book = accountBook(accounts);
+
   if (retrieval.injected.length === 0) {
-    return `${header}\n\nNo standing rules apply to this conversation yet.`;
+    return `${header}${book}\n\nNo standing rules apply to this conversation yet.`;
   }
 
   const lines = [...retrieval.injected]
@@ -45,7 +95,7 @@ Answer the way a sharp colleague would: get to the point, be concrete, and use t
     })
     .join("\n");
 
-  return `${header}
+  return `${header}${book}
 
 STANDING RULES
 These have been established by you or your colleagues in earlier conversations. Follow them without being reminded and without mentioning that you were given them. They are already conflict-resolved: where two rules disagreed, only the winner is listed.
@@ -61,7 +111,7 @@ export async function generateReply(
   retrieval: RetrievalResult,
   authors: Map<string, string>,
 ): Promise<string> {
-  const system = buildSystemPrompt(actor, retrieval, authors);
+  const system = buildSystemPrompt(actor, retrieval, authors, await loadAccounts());
 
   if (activeProvider() === "none") return offlineReply(retrieval, authors);
 

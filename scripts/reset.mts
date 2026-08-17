@@ -19,6 +19,7 @@ const url = process.env.DATABASE_URL ?? "file:./data/memory.db";
 const client = createClient({ url, authToken: process.env.DATABASE_AUTH_TOKEN });
 
 const tables = [
+  "accounts",
   "message_memories",
   "memory_events",
   "memories",

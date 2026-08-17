@@ -105,6 +105,16 @@ export const SCHEMA = [
      relation TEXT NOT NULL,
      PRIMARY KEY (message_id, memory_id, relation)
    )`,
+  `CREATE TABLE IF NOT EXISTS accounts (
+     id TEXT PRIMARY KEY,
+     name TEXT NOT NULL,
+     seats INTEGER NOT NULL,
+     prior_term_usd INTEGER NOT NULL,
+     q3_sheet_usd INTEGER NOT NULL,
+     rate_card_usd INTEGER NOT NULL,
+     renews_on TEXT NOT NULL,
+     notes TEXT NOT NULL
+   )`,
   `CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_memories_scope ON memories(scope, status)`,
   `CREATE INDEX IF NOT EXISTS idx_memories_team ON memories(team_id)`,

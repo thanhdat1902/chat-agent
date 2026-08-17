@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { AppState, MemoryView } from "@/lib/state";
 import type { ChatSession, Scope } from "@/lib/types";
 import { DEMO_PROMPTS } from "./demos";
+import Markdown from "./Markdown";
 import { PENDING_PREFIX, type ChatMeta } from "./App";
 
 const SCOPE_STYLE: Record<string, string> = {
@@ -162,13 +163,15 @@ export default function Conversation({
                   className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed transition-opacity ${
+                    className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed transition-opacity ${
                       m.role === "user"
-                        ? "bg-[var(--accent)] text-white"
+                        ? "whitespace-pre-wrap bg-[var(--accent)] text-white"
                         : "panel rounded-tl-sm"
                     } ${m.id.startsWith(PENDING_PREFIX) ? "opacity-70" : ""}`}
                   >
-                    {m.content}
+                    {/* User turns are what they typed — render verbatim. Assistant
+                        turns come back as markdown. */}
+                    {m.role === "user" ? m.content : <Markdown>{m.content}</Markdown>}
                   </div>
                 </div>
 
