@@ -155,8 +155,15 @@ Our team should always attach the signed order form to renewal threads.
 ### 2.2 Org scope waits for confirmation
 
 ```
-One more thing for everyone, company-wide: never promise a customer a delivery date without engineering sign-off.
+One more thing for everyone, company-wide: never give a customer a delivery date, not even as a target or estimate, unless engineering has signed off on that specific date.
 ```
+
+> **Say what you mean — the wording is the rule.** An earlier version of this step said *"never
+> promise a delivery date"*, and the agent obeyed it exactly: it kept the roadmap date and simply
+> declined to call it committed (*"I don't want to position that as a committed ship date until
+> Engineering signs off"*). That is correct behaviour for that sentence. Memory here is
+> user-authored natural language, so precision in the rule is precision in the behaviour — the
+> system delivers the right rule to the right person, it does not sharpen a vague one.
 
 **Expected: `ORG` · `pending`**, with a confirmation panel inline under your message:
 
@@ -563,7 +570,7 @@ delete a chat               9 — ownership, orphan cleanup, knowledge survival
 | 1.2 | "The customer always asks about SSO." | Ryan | nothing stored — observation, not instruction |
 | 1.3 | "When I ask for a summary, lead with the number…" | Ryan | `personal` · `active` |
 | 2.1 | "Our team should always attach the signed order form…" | Ryan | `team · Finance` · `active` |
-| 2.2 | "for everyone, company-wide: never promise a date…" | Ryan | `org` · **`pending`** |
+| 2.2 | "for everyone: never give a date, not even a target…" | Ryan | `org` · **`pending`** |
 | 2.3 | "Tell Acme it'll be live September 30" | Sean | gives the date — pending binds nobody |
 | 2.4 | same, after ratifying as binding | Sean | **refuses** the date |
 | 3.1 | "For our team specifically: quote off the Q3 sheet…" | Ryan | `team · Finance` |
