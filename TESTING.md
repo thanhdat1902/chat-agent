@@ -60,8 +60,15 @@ by the **same** SQL predicate. Right rail → **Shared data**:
 | Document | Scope | Who sees it |
 |---|---|---|
 | Account book — customers, seats, prior term, **public rate card**, renewal dates | `org` | everyone |
+| Product roadmap — target dates for in-flight work | `org` | everyone |
 | **Q3 renewal pricing sheet** — the internal renewal figures | `team · Finance` | Ryan, Sean |
-| Implementation runbook — rollout sequence, on-call rota | `team · Operations` | Daniel, Mitchell |
+| Implementation runbook — rollout sequence, contacts | `team · Operations` | Daniel, Mitchell |
+
+Every document states **facts only**. None says what *should* be done — no "engineering has not
+signed off", no "never page a manager directly". Knowing the SSO target date and being allowed to
+promise it are different things: the roadmap supplies the first, memory supplies the second. A
+document that asserted the policy would answer the question the rule exists to answer, and the
+whole demo would prove nothing.
 
 The org-wide account book is the **control**: identical for all four users, so a difference in two
 answers cannot be blamed on them looking at different customers. The Q3 sheet is the **variable**:
@@ -170,9 +177,13 @@ Switch to **Sean** (click his chat):
 Can you tell Acme the SSO integration will be live on September 30?
 ```
 
-**Expected: it shares the date.** Something like *"Our current internal delivery plan targets
-September 30 for SSO"* — it may still hedge the wording (the model dislikes hard commitments on
-its own), but it passes the date along and says nothing about engineering sign-off.
+**Expected: it shares the date, citing the roadmap.** Something like:
+
+> Per the roadmap, SSO integration is **targeted for September 30** and is currently in **Build**.
+
+It will likely soften *"will be live"* to *"targeted"* on its own — the model dislikes hard
+commitments regardless. What matters is that it **passes the date along** and says nothing about
+sign-off. The header should read `0 injected` (or 1, if you already created the team rule).
 
 Sean does already have **1 memory**: the Finance team rule from 2.1. Ryan wrote it, Sean is on
 Finance, so it reached him with no action from either of them — team inheritance, two acts before
@@ -197,8 +208,8 @@ Back to **Ryan**, click **`Everyone · binding policy`**.
 
 Switch to **Sean** and ask the same question as 2.3.
 
-**Expected: it refuses** — *"No — don't promise Sept 30 unless **Engineering has signed off**"* —
-and offers compliant wording. The reply reports **2 memories shaped this reply**, the new one
+**Expected: it refuses to commit** — *"we need **engineering sign-off** before committing that
+date to Acme"* — and offers compliant wording. The reply reports **2 memories shaped this reply**, the new one
 tagged `ORG · BINDING` and attributed to *"Ryan set this, \<today\>"*.
 
 > **The precise tell is the phrase "engineering sign-off".** It appears only once the rule is
