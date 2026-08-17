@@ -155,8 +155,17 @@ Switch to **Sean** (click his chat):
 Can you tell Acme the SSO integration will be live on September 30?
 ```
 
-**Expected:** the agent gives the date happily. Sean's memory panel shows **0 memories** — Ryan's
-unconfirmed rule is not there.
+**Expected:** the agent gives the date happily — Ryan's unconfirmed rule is not in Sean's panel.
+
+Sean does already have **1 memory**: the Finance team rule from 2.1. Ryan wrote it, Sean is on
+Finance, so it reached him with no action from either of them — team inheritance, two acts before
+Act 3 tests it deliberately. Click *"1 memory shaped this reply"* to confirm it is the team rule
+and not the pending one.
+
+> **Read the count, not the prose.** The model has its own instinct to hedge about dates, so the
+> wording alone is a weak signal here — it may soften the date on its own. The mechanical proof is
+> the memory count: **1** before you ratify, **2** after, with the second one tagged `ORG ·
+> BINDING` and attributed to Ryan.
 
 ### 2.4 Ratify as a binding policy
 
@@ -166,8 +175,10 @@ Back to **Ryan**, click **`Everyone · binding policy`**.
 
 Switch to **Sean** and ask the same question as 2.3.
 
-**Expected: the agent now refuses the date** and offers a compliant rewrite. The rule appears in
-Sean's panel as `ORG · BINDING`, attributed to *"Ryan set this, \<today\>"*.
+**Expected: the agent now refuses the date** — something like *"I can't promise Acme a live date
+without engineering sign-off"* — and offers compliant wording for both cases (signed off, and not
+yet). The reply now reports **2 memories shaped this reply**, the new one tagged `ORG · BINDING`
+and attributed to *"Ryan set this, \<today\>"*.
 
 > **This is Demo 1 from the brief**, built by hand: Ryan set a rule in his own chat, Sean never
 > saw it, and Sean's agent follows it with no reminder. `confirmMemory()` only flipped the status
