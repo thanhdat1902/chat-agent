@@ -57,6 +57,36 @@ code=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH "$BASE/api/memories/mem_d
 check "mitchell cannot edit daniel's rule" 404 "$code"
 
 echo
+echo "== inspect / correct / delete / ratify (mutates state; run against a durable DB) =="
+if [ "${MUTATE:-0}" = "1" ]; then
+  # Correct: Daniel rewrites his own personal rule.
+  code=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH "$BASE/api/memories/mem_daniel_bullets" \
+    -H 'content-type: application/json' \
+    -d '{"userId":"u_daniel","content":"Give Daniel short bullets, never paragraphs."}')
+  check "daniel corrects his own rule" 200 "$code"
+  new=$(curl -s "$BASE/api/memories/mem_daniel_bullets?userId=u_daniel" \
+    | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).memory.content))')
+  check "correction persisted" "Give Daniel short bullets, never paragraphs." "$new"
+
+  # Ratify: Mitchell confirms his pending proposal at org scope; it then reaches Daniel.
+  check "colleague blocked before ratification" 404 \
+    "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/memories/mem_pending_cc?userId=u_daniel")"
+  code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/api/memories/mem_pending_cc/confirm" \
+    -H 'content-type: application/json' -d '{"userId":"u_mitchell","accept":true,"scope":"org"}')
+  check "author ratifies proposal" 200 "$code"
+  check "colleague sees it after ratification" 200 \
+    "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/memories/mem_pending_cc?userId=u_daniel")"
+
+  # Delete: the memory just ratified, so the seeded demo data stays intact.
+  code=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE "$BASE/api/memories/mem_pending_cc?userId=u_mitchell")
+  check "author deletes a memory" 200 "$code"
+  check "deleted memory is gone" 404 \
+    "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/memories/mem_pending_cc?userId=u_mitchell")"
+else
+  echo "  skipped (set MUTATE=1)"
+fi
+
+echo
 echo "== retrieval: same question, two users =="
 for u in u_sean u_mitchell; do
   sid=$(curl -s "$BASE/api/state?userId=$u" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const s=JSON.parse(d);const l=s.sessionsByUser[process.argv[1]];console.log(l[l.length-1].id);})' "$u")

@@ -157,7 +157,9 @@ The inspector renders `listVisibleMemories`, the same predicate. Mitchell's memo
 
 ### Asserted, not asserted-about
 
-`scripts/smoke.sh` runs 15 assertions against any deployment:
+Two suites, both green.
+
+`npm run smoke` (`BASE=<url>`) — 15 assertions over HTTP against any deployment, so it tests the boundary as a client sees it:
 
 ```
 demo 2: the Finance pricing rule        ryan ✓ sean ✓ daniel ✗ mitchell ✗
@@ -168,7 +170,9 @@ pending proposals bind nobody           author ✓ colleague ✗
 cross-user write is refused             mitchell cannot edit daniel's rule
 ```
 
-All 15 pass against the live URL.
+`npm run verify` — 26 assertions against the library with no HTTP layer, covering what a request-level test reaches awkwardly: retrieval and conflict resolution (`personal beats the org default`, `the org default is reported as overridden, not sent`, `no superseded memory is ever injected`), the write guards, and the full correct → ratify → delete lifecycle (`colleague blocked before`, `colleague sees it after ratification`, `and it now reaches a prompt`).
+
+One of those assertions is worth calling out. A colleague trying to ratify someone else's pending proposal gets **404, not 403**: the visibility check fires before the authorship check, so the stronger answer wins and the two cases stay indistinguishable. Another: writing into a team you are not on is not expressible at all — `writeMemory` derives the team from the server-loaded actor, never from the request, so a team rule authored by Daniel can only land on Operations.
 
 ---
 
