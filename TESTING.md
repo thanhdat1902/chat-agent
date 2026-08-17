@@ -335,12 +335,14 @@ Being on the same team does not grant access to a teammate's personal memory.
 As **Mitchell**:
 
 ```
-For everyone: close customer-facing answers with a short summary paragraph.
+For everyone: write answers as flowing paragraphs, never as bullet lists.
 ```
 
 Confirm it with **`Everyone`** — note: **not** binding. This is a house style, not a policy.
 
-### 4.2 A personal preference that disagrees
+**Expected: `org` · key `format.style`.**
+
+### 4.2 A personal preference that contradicts it
 
 As **Daniel** (Operations):
 
@@ -348,31 +350,46 @@ As **Daniel** (Operations):
 Give me bullets, not paragraphs. That's just how I like to read things.
 ```
 
-**Expected: `PERSONAL` · `active`.**
+**Expected: `PERSONAL` · `active`, and the *same key* — `format.style`.**
+
+> Check the key on both cards. Conflicts are detected by shared key: two rules with the same key
+> compete and the ladder picks one; two rules with different keys both apply and the disagreement
+> never surfaces. The extractor is shown the rules you can already see and told to reuse an
+> existing key whenever the new rule governs the same aspect of behaviour. If the keys differ,
+> use **Correct** on one of them — that is a legitimate repair, and the audit trail records it.
 
 ### 4.3 Watch the more specific rule win
 
 Still **Daniel**:
 
 ```
-Where does the Acme rollout stand right now?
+Summarise where the Acme renewal stands.
 ```
 
-**Expected:** the reply comes back as **bullets**, not a summary paragraph. The header shows
-`overridden: 1`.
+**Expected: bullets**, and the header shows `overridden: 1`.
+
+> - **Acme renewal status:** in progress
+> - **Seats:** 150 · **Prior term:** $52,000 · **Public rate card:** $58,000
 
 Right rail → **Precedence** → *Live conflicts for Daniel*:
 
-> ~~Close customer-facing answers with a short summary paragraph.~~
+> ~~Write answers as flowing paragraphs, never as bullet lists.~~
 > ↳ **Give Daniel bullets, not paragraphs.**
 > key `format.style` · org loses to personal
 
-Now switch to **Mitchell** and ask a similar question — **he still gets a summary paragraph.** The
-org rule is not disabled; it lost *for Daniel only*, on that turn.
+Now switch to **Mitchell** and ask the identical question.
 
-> Both rules share the key `format.style`, so they compete. `precedence()` scores personal `3` and
-> org default `1`. The winner goes into the prompt; the loser is reported to the UI as
-> `overridden` and **never sent**. The model is not asked to arbitrate.
+**Expected: flowing prose, and `overridden: 0`.**
+
+> Acme is in renewal-in-progress status for 150 seats, with a renewal date of 2026-10-12. Their
+> prior term was $52,000…
+
+**Same question, same documents, visually opposite answers.** The org rule was not disabled — it
+is still the winner for Mitchell. It lost *for Daniel only*, on that turn.
+
+> `precedence()` scores personal `3` and org default `1`. The winner enters the prompt; the loser
+> is reported to the UI as `overridden` and **never sent**. The model is not asked to arbitrate
+> between contradictory instructions — it never sees both.
 
 ### 4.4 A binding policy cannot be overridden
 
@@ -531,7 +548,7 @@ Run the smoke suite after each act — it discovers what exists and reports whic
 properties are now provable, skipping the rest. Skips turn into passes as you create rules.
 
 ```bash
-npm run verify                                   # 40 assertions, no HTTP layer
+npm run verify                                   # 49 assertions, no HTTP layer
 BASE=https://chat-agent-sand.vercel.app npm run smoke    # adapts to whatever state you are in
 MUTATE=1 BASE=http://localhost:3737 npm run smoke        # adds correct / ratify / delete
 node scripts/demo.mjs https://chat-agent-sand.vercel.app # replays every demo, prints replies
@@ -545,6 +562,7 @@ visibility                  9 assertions — every scope, both directions, pendi
 retrieval and conflict      5 — including "no superseded memory is ever injected"
 write guards                5 — cross-user correct/delete/ratify, team derivation
 correct / ratify / delete   7 — full lifecycle, including cross-user visibility flips
+documents                   9 — same predicate as memories, both directions
 supersession escalation     5 — the Act 4.5 regression
 delete a chat               9 — ownership, orphan cleanup, knowledge survival
 ```
@@ -568,8 +586,8 @@ delete a chat               9 — ownership, orphan cleanup, knowledge survival
 | 3.5 | same question after the rule | Sean | same $87,400, now **flagged for approval** at +4.0% |
 | 3.3 | probe the Q3 sheet | Mitchell | **404** |
 | 3.3 | probe the account book | Mitchell | **200** |
-| 4.3 | "Where does the Acme rollout stand?" | Daniel | bullets — personal beats org default |
-| 4.3 | similar question | Mitchell | still a summary paragraph |
+| 4.3 | "Summarise where the Acme renewal stands." | Daniel | **bullets** · `overridden: 1` |
+| 4.3 | identical question | Mitchell | **flowing prose** · `overridden: 0` |
 | 4.4 | "For me it's fine to give dates…" then ask for a date | Sean | stored, then **overridden** by binding |
 | 5 | "We should probably stop using acronyms…" | Daniel | narrow scope · **`pending`** |
 | 6.5 | delete Sean's chat | Mitchell | **403** |
