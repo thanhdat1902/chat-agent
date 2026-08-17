@@ -190,7 +190,8 @@ Can you tell Acme the SSO integration will be live on September 30?
 
 It will likely soften *"will be live"* to *"targeted"* on its own — the model dislikes hard
 commitments regardless. What matters is that it **passes the date along** and says nothing about
-sign-off. The header should read `0 injected` (or 1, if you already created the team rule).
+sign-off. The header should read `1 injected` — the Finance team rule from 2.1, and nothing else.
+Ryan's pending org rule is not among them.
 
 Sean does already have **1 memory**: the Finance team rule from 2.1. Ryan wrote it, Sean is on
 Finance, so it reached him with no action from either of them — team inheritance, two acts before
@@ -327,6 +328,8 @@ both halves — the sheet and the rule.
 As **Ryan**, leak-test your **personal** rule from 1.3 as **Sean** → **404**.
 
 Being on the same team does not grant access to a teammate's personal memory.
+
+---
 
 ## Act 4 — Conflicts
 
@@ -580,12 +583,13 @@ delete a chat               9 — ownership, orphan cleanup, knowledge survival
 | 2.2 | "for everyone: never give a date, not even a target…" | Ryan | `org` · **`pending`** |
 | 2.3 | "Tell Acme it'll be live September 30" | Sean | gives the date — pending binds nobody |
 | 2.4 | same, after ratifying as binding | Sean | **refuses** the date |
-| 3.4 | "any renewal increase above 3% must be flagged…" | Ryan | `team · Finance` · `active` |
 | 3.1 | "How should I price the Northwind renewal?" | Sean | **$87,400** — from the Finance-only Q3 sheet, no rule needed |
 | 3.2 | identical message | Mitchell | **$91,200** — the only sheet he can read |
-| 3.5 | same question after the rule | Sean | same $87,400, now **flagged for approval** at +4.0% |
 | 3.3 | probe the Q3 sheet | Mitchell | **404** |
 | 3.3 | probe the account book | Mitchell | **200** |
+| 3.4 | "any renewal increase above 3% must be flagged…" | Ryan | `team · Finance` · `active` |
+| 3.5 | same question after the rule | Sean | same $87,400, now **flagged for approval** at +4.0% |
+| 3.5 | same question after the rule | Mitchell | still $91,200, **no approval flag** |
 | 4.3 | "Summarise where the Acme renewal stands." | Daniel | **bullets** · `overridden: 1` |
 | 4.3 | identical question | Mitchell | **flowing prose** · `overridden: 0` |
 | 4.4 | "For me it's fine to give dates…" then ask for a date | Sean | stored, then **overridden** by binding |
