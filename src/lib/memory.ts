@@ -308,11 +308,24 @@ export async function writeMemory(
   );
 
   if (supersede.allowed) {
-    await run(`UPDATE memories SET status = 'superseded', updated_at = ? WHERE id = ?`, [
-      now,
-      supersede.allowed,
-    ]);
-    await logEvent(supersede.allowed, actor.user.id, "superseded", `Replaced by ${memoryId}`);
+    /**
+     * A pending memory binds nobody, so it must not retire anything either.
+     * Applying the supersession at write time left a window in which the old
+     * rule was already gone for everyone while the replacement was in force for
+     * no one — and a proposal the author then discarded would have retired a
+     * live rule permanently. The claim is recorded on the row and replayed by
+     * `confirmMemory`, re-checked against the scope the author actually picks.
+     */
+    if (status === "active") {
+      await retire(supersede.allowed, memoryId, actor.user.id, now);
+    } else {
+      await logEvent(
+        memoryId,
+        actor.user.id,
+        "supersession deferred",
+        `Would replace ${supersede.allowed} — held until this proposal is ratified.`,
+      );
+    }
   } else if (supersede.refused) {
     await logEvent(
       memoryId,
@@ -324,6 +337,19 @@ export async function writeMemory(
 
   const created = await requireMemory(actor, memoryId);
   return created;
+}
+
+async function retire(
+  targetId: string,
+  replacementId: string,
+  actorId: string,
+  at: string,
+): Promise<void> {
+  await run(`UPDATE memories SET status = 'superseded', updated_at = ? WHERE id = ?`, [
+    at,
+    targetId,
+  ]);
+  await logEvent(targetId, actorId, "superseded", `Replaced by ${replacementId}`);
 }
 
 export async function persistExtraction(
@@ -409,6 +435,29 @@ export async function confirmMemory(
     "ratified",
     `Confirmed at ${scope} scope${decision.binding ? " (binding)" : ""}.`,
   );
+
+  /**
+   * Replay a supersession claim that was held while the memory was pending.
+   * It is re-checked at the scope the author actually ratified, not the one the
+   * extractor proposed: an org proposal that claims to replace an org rule but
+   * gets narrowed to "Just me" must not still retire it. A claim that no longer
+   * holds is dropped from the row so it cannot assert something untrue later.
+   */
+  if (memory.supersedes_id) {
+    const recheck = await permittedSupersession(actor, scope, memory.supersedes_id);
+    if (recheck.allowed) {
+      await retire(recheck.allowed, memoryId, actor.user.id, nowIso());
+    } else {
+      await run(`UPDATE memories SET supersedes_id = NULL WHERE id = ?`, [memoryId]);
+      await logEvent(
+        memoryId,
+        actor.user.id,
+        "supersession refused",
+        `Wanted to replace ${memory.supersedes_id} — ${recheck.reason}. Both kept; precedence decides.`,
+      );
+    }
+  }
+
   return requireMemory(actor, memoryId);
 }
 

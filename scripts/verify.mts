@@ -243,6 +243,70 @@ check(
 );
 await deleteMemory(daniel, second.id);
 
+// Regression: a *pending* memory binds nobody, so it must not retire anything
+// either. Applying the claim at write time meant an unratified proposal — one
+// the author could still discard — removed a live rule for the whole org.
+const liveOrgRule = await writeMemory(ryan, {
+  scope: "org", key: "verify.pending.super", content: "org default v1",
+  confidence: 1, rationale: "", quote: "", sessionId: null, messageId: null,
+  forceStatus: "active",
+});
+const proposal = await writeMemory(ryan, {
+  scope: "org", key: "verify.pending.super", content: "org default v2",
+  confidence: 1, rationale: "", quote: "", sessionId: null, messageId: null,
+  supersedesId: liveOrgRule.id,
+});
+check("an org proposal lands pending", "pending", proposal.status);
+check(
+  "and has NOT retired the live rule while it waits",
+  "active",
+  (await getMemoryAs(ryan, liveOrgRule.id))?.status,
+);
+check(
+  "the deferral is recorded",
+  true,
+  (await memoryEvents(proposal.id)).some((e) => e.action === "supersession deferred"),
+);
+check(
+  "discarding the proposal leaves the live rule untouched",
+  "active",
+  (await confirmMemory(ryan, proposal.id, { accept: false }),
+  (await getMemoryAs(ryan, liveOrgRule.id))?.status),
+);
+
+// And a proposal narrowed on ratification cannot still retire the wider rule.
+const narrowed = await writeMemory(ryan, {
+  scope: "org", key: "verify.pending.super", content: "org default v3",
+  confidence: 1, rationale: "", quote: "", sessionId: null, messageId: null,
+  supersedesId: liveOrgRule.id,
+});
+await confirmMemory(ryan, narrowed.id, { accept: true, scope: "personal" });
+check(
+  "ratifying an org proposal as personal does not retire the org rule",
+  "active",
+  (await getMemoryAs(ryan, liveOrgRule.id))?.status,
+);
+check(
+  "and the now-invalid claim is dropped from the row",
+  null,
+  (await getMemoryAs(ryan, narrowed.id))?.supersedes_id,
+);
+
+// The ratified-as-proposed path still retires, so this is not a blanket block.
+const honoured = await writeMemory(ryan, {
+  scope: "org", key: "verify.pending.super", content: "org default v4",
+  confidence: 1, rationale: "", quote: "", sessionId: null, messageId: null,
+  supersedesId: liveOrgRule.id,
+});
+await confirmMemory(ryan, honoured.id, { accept: true });
+check(
+  "ratifying at the proposed scope does retire it",
+  "superseded",
+  (await getMemoryAs(ryan, liveOrgRule.id))?.status,
+);
+await deleteMemory(ryan, honoured.id);
+await deleteMemory(ryan, narrowed.id);
+
 console.log("\n== delete a chat ==");
 const { deleteSession } = await import("../src/lib/sessions");
 const { all } = await import("../src/lib/db");

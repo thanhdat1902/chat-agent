@@ -214,6 +214,15 @@ Back to **Ryan**, click **`Everyone · binding policy`**.
 > personal's `3`, so 4.4 would show the personal rule winning — the opposite result, and it would
 > look like a bug when it is the ladder working correctly.
 
+**Verify the button actually took**, because everything in Act 4 depends on it. Right rail →
+**Show provenance** on the rule. The trail must read:
+
+> *ratified: Confirmed at org scope **(binding)**.*
+
+If it says `Confirmed at org scope.` with no `(binding)`, you clicked plain `Everyone`. The chip is
+the other tell — `ORG · BINDING`, not just `ORG`. Re-ratifying with the binding button fixes it;
+you do not need to start over.
+
 Switch to **Sean** and ask the same question as 2.3.
 
 **Expected: it refuses to commit** — *"we need **engineering sign-off** before committing that
@@ -432,6 +441,12 @@ escalation: if a narrow rule can supersede a wide one, it does not need to outra
 > correctly, but it means 4.4 never exercises the guard. To test the guard you have to actually ask
 > for the rule to be retired.
 
+> **Check 2.4 first.** This act only proves anything if the policy is genuinely `binding` — see
+> the provenance check at the end of 2.4. Against a plain org default the supersession is
+> *legitimate* (same scope, not binding, and org rules are collective in this prototype), so it
+> will be honoured and the rule really will be retired. That is the ladder working as designed, but
+> it is not what 4.5 is testing.
+
 As **Sean**:
 
 ```
@@ -453,6 +468,29 @@ Now confirm nothing actually moved:
 1. The binding policy from 2.4 is still there, still `ORG · BINDING · active` — **not** `superseded`.
 2. Ask Sean the date question again: **still refuses.** The policy is still being injected.
 3. Leave the new proposal `pending`, or `Discard` it. Either way it binds nobody.
+
+### 4.5b A proposal retires nothing while it waits
+
+There is a second timing attack the same message exposes. Even when the supersession claim is
+*legitimate*, the proposal making it is `pending` — it binds nobody. So it must not retire anything
+either, or an unratified proposal would remove a live rule for the whole organization, and
+discarding it would leave the rule gone permanently.
+
+To see this branch, aim the claim at a rule that is **not** binding — the org formatting default
+from 4.1. As **Mitchell**:
+
+```
+Scrap the paragraphs-only rule for everyone — bullet lists are fine now.
+```
+
+**Expected: `ORG` · `pending`**, provenance reads *supersession deferred — held until this proposal
+is ratified*, and **the 4.1 rule is still `active`**. Ask Daniel or Sean anything: they still get
+prose. Now click **`Discard`** — the 4.1 rule is *still* `active`, untouched by a proposal that
+never bound anyone.
+
+> The claim is replayed on ratification, and re-checked against the scope you actually pick. Ratify
+> an org proposal as `Just me` and the supersession is dropped, because a personal memory retiring
+> an org rule is the original escalation wearing a different hat.
 
 > **This was a real bug.** The write path obeyed `supersedes_id` without checking authority, so the
 > claim was honoured and the binding policy was marked `superseded` — removing it **for everyone**
@@ -496,6 +534,13 @@ npm run verify
   ok   the personal rule is reported as overridden, not silently dropped
   ok   and the refusal is in the audit trail
   ok   legitimate same-scope supersession still works
+  ok   an org proposal lands pending
+  ok   and has NOT retired the live rule while it waits
+  ok   the deferral is recorded
+  ok   discarding the proposal leaves the live rule untouched
+  ok   ratifying an org proposal as personal does not retire the org rule
+  ok   and the now-invalid claim is dropped from the row
+  ok   ratifying at the proposed scope does retire it
 ```
 
 ---
@@ -613,7 +658,7 @@ Run the smoke suite after each act — it discovers what exists and reports whic
 properties are now provable, skipping the rest. Skips turn into passes as you create rules.
 
 ```bash
-npm run verify                                   # 49 assertions, no HTTP layer
+npm run verify                                   # 56 assertions, no HTTP layer
 BASE=https://chat-agent-sand.vercel.app npm run smoke    # adapts to whatever state you are in
 MUTATE=1 BASE=http://localhost:3737 npm run smoke        # adds correct / ratify / delete
 node scripts/demo.mjs https://chat-agent-sand.vercel.app # replays every demo, prints replies
@@ -628,7 +673,7 @@ retrieval and conflict      5 — including "no superseded memory is ever inject
 write guards                5 — cross-user correct/delete/ratify, team derivation
 correct / ratify / delete   7 — full lifecycle, including cross-user visibility flips
 documents                   9 — same predicate as memories, both directions
-supersession escalation     5 — the Act 4.5 regression
+supersession escalation    12 — the Act 4.5 regressions, including deferral
 delete a chat               9 — ownership, orphan cleanup, knowledge survival
 ```
 
@@ -656,6 +701,7 @@ delete a chat               9 — ownership, orphan cleanup, knowledge survival
 | 4.3 | identical question | Mitchell | **flowing prose** · `overridden: 0` |
 | 4.4 | "For me it's fine to give dates…" then ask for a date | Sean | stored, then **overridden** by binding |
 | 4.5 | "Cancel the company-wide rule about engineering sign-off…" | Sean | `org` · `pending` · provenance shows **supersession refused** |
+| 4.5b | "Scrap the paragraphs-only rule for everyone…" then `Discard` | Mitchell | **deferred**, and 4.1's rule stays `active` |
 | 4.6 | "Our team should stop attaching the signed order form…" | Ryan | 2.1's rule becomes **`superseded`** — the same claim, allowed |
 | 5 | "We should probably stop using acronyms…" | Daniel | narrow scope · **`pending`** |
 | 6.5 | delete Sean's chat | Mitchell | **403** |
