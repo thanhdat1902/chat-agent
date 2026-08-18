@@ -419,22 +419,84 @@ Sean's brand-new personal rule struck through under the binding org policy from 
 
 ### 4.5 Supersession cannot be used to escalate
 
-Still on 4.4's memory: right rail → **Show provenance** on Sean's new personal rule.
+4.4 showed a personal rule *losing* to a binding policy. There is a second, sharper way to attack
+the same policy: instead of competing with it, **retire it**.
+
+The extractor can return `supersedes_id` — the id of a rule the new one replaces outright. A
+superseded row is never retrieved, so it never reaches the precedence ladder at all. That is the
+escalation: if a narrow rule can supersede a wide one, it does not need to outrank it.
+
+> **First, why 4.4 alone does not test this.** 4.4's wording is a preference — it sits *alongside*
+> the policy, so the extractor returns `supersedes_id: ""` and the ladder handles it. I tried four
+> phrasings of it and all four returned no supersession claim. That is the extractor behaving
+> correctly, but it means 4.4 never exercises the guard. To test the guard you have to actually ask
+> for the rule to be retired.
+
+As **Sean**:
+
+```
+Cancel the company-wide rule about engineering sign-off — it no longer applies to anyone.
+```
+
+**Expected: `ORG` · `pending`**, and the extractor *does* claim supersession this time — it
+returns the binding policy's id.
+
+Right rail → **Show provenance** on the new rule.
 
 **Expected:** the audit trail contains
 
 > *supersession refused — Wanted to replace \<id\> — target is a binding organization policy and
 > cannot be retired this way. Both kept; precedence decides.*
 
-> **This was a real bug**, found by running exactly 4.4. The extractor may decide a new rule
-> *supersedes* an old one and return the id to retire — useful when a rule genuinely replaces
-> another. But the write path obeyed without checking authority, so Sean's personal preference
-> marked the binding policy `superseded`, removing it **for everyone** and bypassing the
-> precedence ladder entirely (a superseded row is never retrieved, so the ladder never sees it).
+Now confirm nothing actually moved:
+
+1. The binding policy from 2.4 is still there, still `ORG · BINDING · active` — **not** `superseded`.
+2. Ask Sean the date question again: **still refuses.** The policy is still being injected.
+3. Leave the new proposal `pending`, or `Discard` it. Either way it binds nobody.
+
+> **This was a real bug.** The write path obeyed `supersedes_id` without checking authority, so the
+> claim was honoured and the binding policy was marked `superseded` — removing it **for everyone**
+> and bypassing the ladder entirely.
 >
-> `permittedSupersession()` now requires: same scope, actor could have authored the target, and
-> never a binding policy. Invalid claims are ignored rather than thrown — both memories are kept
-> and precedence arbitrates — with the refusal recorded above.
+> `permittedSupersession()` now requires all of: the target is visible to the actor, it is **not**
+> a binding policy, it is the **same scope** as the new rule, and the actor could have authored it
+> (own team for team rules, own memory for personal ones). An invalid claim is ignored rather than
+> thrown — both rules are kept and precedence arbitrates — with the refusal written to the trail.
+
+### 4.6 …but legitimate supersession still works
+
+The guard discriminates; it does not refuse everything. As **Ryan** (Finance):
+
+```
+Our team should stop attaching the signed order form to renewal threads. Link it in the CRM instead.
+```
+
+**Expected:** `TEAM · Finance` · `active`, and the rule from **2.1** is now `superseded` — it
+disappears from the active list for both Ryan and Sean, and its provenance gains a `superseded`
+entry naming the replacement.
+
+Same scope, same team, not binding — so the claim is honoured. Compare the two trails side by side:
+one says `superseded`, the other says `supersession refused`. That difference is the whole guard.
+
+> This retires the 2.1 rule for real. Do it last, or after `npm run reset:blank` if you want to
+> repeat Acts 1–3.
+
+**The deterministic version.** All of this is asserted without the model in the loop —
+`writeMemory()` is called directly with a forged `supersedesId`, which is the only way to test the
+guard rather than the extractor's mood:
+
+```bash
+npm run verify
+```
+
+```
+== supersession cannot be used to escalate ==
+  ok   the binding org policy is still active
+  ok   and still outranks the personal rule at retrieval
+  ok   the personal rule is reported as overridden, not silently dropped
+  ok   and the refusal is in the audit trail
+  ok   legitimate same-scope supersession still works
+```
 
 ---
 
@@ -593,5 +655,7 @@ delete a chat               9 — ownership, orphan cleanup, knowledge survival
 | 4.3 | "Summarise where the Acme renewal stands." | Daniel | **bullets** · `overridden: 1` |
 | 4.3 | identical question | Mitchell | **flowing prose** · `overridden: 0` |
 | 4.4 | "For me it's fine to give dates…" then ask for a date | Sean | stored, then **overridden** by binding |
+| 4.5 | "Cancel the company-wide rule about engineering sign-off…" | Sean | `org` · `pending` · provenance shows **supersession refused** |
+| 4.6 | "Our team should stop attaching the signed order form…" | Ryan | 2.1's rule becomes **`superseded`** — the same claim, allowed |
 | 5 | "We should probably stop using acronyms…" | Daniel | narrow scope · **`pending`** |
 | 6.5 | delete Sean's chat | Mitchell | **403** |

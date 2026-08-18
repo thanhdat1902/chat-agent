@@ -172,8 +172,16 @@ check("operations does not", null, await getDocumentAs(mitchell, "doc_q3_pricing
 check("and neither does the other ops member", null, await getDocumentAs(daniel, "doc_q3_pricing"));
 check("operations sees its own runbook", true, Boolean(await getDocumentAs(daniel, "doc_ops_runbook")));
 check("finance does not", null, await getDocumentAs(ryan, "doc_ops_runbook"));
-check("sean's visible set is org + finance", 2, (await listVisibleDocuments(sean)).length);
-check("mitchell's is org + operations", 2, (await listVisibleDocuments(mitchell)).length);
+// Assert the *composition* of each visible set, not its size: a bare count goes
+// stale the moment a document is added to the seed, and fails as if the
+// boundary broke when nothing about the boundary changed.
+const scopesOf = async (a: typeof sean) =>
+  (await listVisibleDocuments(a))
+    .map((d) => (d.scope === "team" ? `team:${d.team_id}` : d.scope))
+    .sort()
+    .join(",");
+check("sean sees org docs plus finance, nothing else", "org,org,team:t_finance", await scopesOf(sean));
+check("mitchell sees org docs plus operations, nothing else", "org,org,team:t_ops", await scopesOf(mitchell));
 check(
   "the Q3 figure is absent from mitchell's documents entirely",
   false,
