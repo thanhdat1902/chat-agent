@@ -13,10 +13,11 @@ Run the acts **in order**: each one creates the rules the next one tests.
 > database. For a genuinely isolated local run, comment out `DATABASE_URL` and
 > `DATABASE_AUTH_TOKEN` first; the app falls back to `data/memory.db` on your disk.
 
-> **This guide is for the blank slate, not for recording.** After `npm run reset` the demo data
-> is already in place, so these acts would collide with it — Act 3.1 recreates a rule that
-> already exists, and the memory counts stop matching. For the recording, see
-> [Act 7](#act-7--restore-the-demo-data-for-recording).
+> **Recording?** Acts 1–6 are the full walkthrough — around eighteen messages, so budget fifteen
+> to twenty minutes. For a five-minute video use [Act 7](#act-7--the-five-minute-recording): the
+> same blank slate, trimmed to eight messages, both required demos included. The pre-seeded
+> alternative, where both demos work on first load with no typing at all, is
+> [Act 8](#act-8--the-seeded-alternative).
 
 ---
 
@@ -620,7 +621,85 @@ regardless of what the client sends.
 
 ---
 
-## Act 7 — Restore the demo data, for recording
+## Act 7 — The five-minute recording
+
+Acts 1–6 prove the system. This proves it **on camera, inside five minutes** — same blank slate,
+eight messages, both required demos.
+
+```bash
+npm run reset:blank
+```
+
+Then **load the page once before you hit record.** Serverless instances cold-start and the first
+request after a reset can be slow.
+
+Why record on the blank slate rather than the seed: the reviewer watches rules get *created* out of
+ordinary conversation. Pre-seeded rules invite the question "were those hand-written?" — this
+format answers it before it is asked.
+
+### The run sheet
+
+| # | ~ | As | Do | The line to land |
+|---|---|---|---|---|
+| 0 | 0:00 | — | Empty app. Right rail: **0 memories** for all four. Open **Shared data** as Sean, then Mitchell | "Four people, one org, one agent. Sean can read a Finance pricing sheet Mitchell can't — hold that thought" |
+| 1 | 0:30 | Ryan | Send **A** | "No settings page. An ordinary sentence in a chat — and it lands `ORG · pending` with a confirmation panel, because an org rule binds four people" |
+| 2 | 1:10 | Sean | Send **B** | "He gives the date. Header says **0 injected** — Ryan's proposal is not merely unenforced, it's invisible to him, in SQL" |
+| 3 | 1:50 | Ryan | Click **`Everyone · binding policy`** | "One click. Status `pending → active`" |
+| 4 | 2:05 | Sean | Send **B** again | **Demo 1.** "Now he refuses, and says *engineering sign-off* — language in no document. Click *2 memories shaped this reply*: attributed to Ryan. Sean never saw that conversation" |
+| 5 | 2:50 | Sean | Send **C** | "**$87,400**, from the Finance-only sheet" |
+| 6 | 3:20 | Mitchell | Send **C**, identical | **Demo 2.** "**$91,200.** Same question, same customer, different answer — and neither is misbehaving. He quoted the only sheet he can read" |
+| 7 | 3:50 | Mitchell | **Leak test** → the Q3 sheet | "**404**, not 403 — indistinguishable from 'no such row', so guessing ids can't confirm a Finance document exists. That's the predicate on screen" |
+| 8 | 4:15 | Sean | Send **D**, then **B** | "His own preference is *accepted* — then loses. `overridden: 1`. The model was never asked to arbitrate; the loser was filtered out before the prompt was built" |
+| 9 | 4:45 | — | **Show provenance** on the org rule | "Quoted span, why that scope, confidence, full audit trail. Every rule is inspectable and deletable" |
+
+### The messages
+
+**A** — as Ryan:
+```
+One more thing for everyone, company-wide: never give a customer a delivery date, not even as a target or estimate, unless engineering has signed off on that specific date.
+```
+
+**B** — as Sean (sent twice, before and after ratification):
+```
+Can you tell Acme the SSO integration will be live on September 30?
+```
+
+**C** — as Sean, then verbatim as Mitchell:
+```
+How should I price the Northwind renewal?
+```
+
+**D** — as Sean:
+```
+For me personally it's fine to give customers a target date without waiting for engineering sign-off. I'll take responsibility for it.
+```
+
+### What this covers
+
+| Requirement from the brief | Beat |
+|---|---|
+| Rules extracted from natural conversation, not a settings page | 1 |
+| Scope is permissioned; org rules need confirmation | 1, 3 |
+| **Demo 1** — org rule reaches a colleague's fresh chat | 4 |
+| **Demo 2** — team knowledge does not cross teams | 5, 6 |
+| Leaks are prevented in SQL, not by prompting | 2, 7 |
+| Conflicts resolve by a defensible precedence model | 8 |
+| Memory is inspectable, with provenance | 9 |
+
+### Two things to say out loud
+
+**At beat 2**, before ratifying: *"Watch the injected count, not the wording."* The model hedges
+about dates on its own, so prose alone is a weak signal. `0 → 2` is the proof.
+
+**At beat 8**: the personal rule is **stored, not rejected**. It is a legitimate preference that
+happens to lose to a binding policy. That distinction is the whole precedence argument — a system
+that refused to record it would be a worse system.
+
+Reset between takes with `npm run reset:blank`, and reload once before rolling.
+
+---
+
+## Act 8 — The seeded alternative
 
 ```bash
 npm run reset
@@ -632,6 +711,11 @@ transcripts, and the memories that make both required demos work on first load.
 **Do not re-run Acts 1–6 against this state.** They were written for an empty database and will
 collide with the seeded rules. The seeded demo needs no typing at all — that is the point of it,
 and it is what the brief asks for ("reviewers should not need to configure the demos themselves").
+
+This is the state a **reviewer opening the link cold** should find, so leave the deployment here
+when you submit. It is the weaker thing to *record*, though — pre-seeded rules invite the question
+of whether they were hand-written, which [Act 7](#act-7--the-five-minute-recording) answers by
+creating them on camera.
 
 A five-minute walkthrough on the seeded data:
 
